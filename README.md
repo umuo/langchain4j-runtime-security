@@ -143,6 +143,10 @@ try (var scope = SecurityContexts.open(context)) {
 
 已验证模型 future 完成、回调／Flow 信号、LangChain4j 默认执行器、工具自定义执行器，以及默认 RAG 编排器执行器和组件 future 的传播与线程复用隔离。业务自行创建的异步任务使用 `SecurityContexts.executor` 或 `wrap`；不自动覆盖任意线程池或 Reactor。详见 [完整接入与边界](docs/security-context.md) 和 [身份策略示例](config/context-tool-policy-example.json)。
 
+## 多 Agent 委托
+
+同 JVM 可通过 `AgentRuntime` 显式创建根任务和子任务，按父权限、子 Agent 上限与申请范围取交集，并在受保护操作前检查有效性。支持父子执行关联、异步子任务、撤销／过期及 schema 3 审计；业务认证与根授权由宿主提供，尚无跨服务 Token 或自动父子调用发现。完整示例见 [多 Agent 接入](docs/multi-agent-security.md)。
+
 ## 扩展检测器 / 单独使用 SDK
 
 完整接入步骤见 [SDK 扩展指南](docs/sdk-extension.md)：扩展点对照、可复制的策略插件、SPI 注册与自检、普通 Java／Boot 部署、事件字段、自定义审计及排错。
@@ -202,13 +206,13 @@ audit.queue.capacity=128
 
 单实例独占日志文件；轮转后最多保留当前文件和 5 个备份。新建 POSIX 文件权限为 `0600`；已有目录／文件权限由部署方管理，目录必须受信任。Windows ACL 未实测。不要用外部 logrotate 操作这些文件；多个 JVM 使用不同路径。`audit.force=true` 每条写入调用 `FileChannel.force(true)`，会增加延迟；不提供跨文件轮转的事务性、断电恢复、远程归档或防篡改保证。
 
-审计表示**策略决策**，不表示模型调用或工具副作用已经成功。超时写入可能稍后出现在日志中，原请求仍然拒绝。JSONL `schemaVersion=2` 新增可空 `runId`；`eventId` 标识一次检测，`runId` 关联同一身份作用域的多个保护层，尚无自动去重。版本拒绝、适配错误、插件加载失败等发生在策略引擎之外的错误，尚未全部进入这个决策日志。具体部署、格式迁移和恢复步骤见 [运行手册](docs/operations.md)。
+审计表示**策略决策**，不表示模型调用或工具副作用已经成功。超时写入可能稍后出现在日志中，原请求仍然拒绝。JSONL `schemaVersion=3` 保留可空 `runId`，并增加 Agent 执行／父执行／委托关联字段；`eventId` 标识一次检测，`runId` 关联同一身份作用域的多个保护层，尚无自动去重。版本拒绝、适配错误、插件加载失败等发生在策略引擎之外的错误，尚未全部进入这个决策日志。具体部署、格式迁移和恢复步骤见 [运行手册](docs/operations.md)。
 
 ## 验证方式
 
 带 SBOM、隔离重建比对和 SHA-256 交付清单的流程：`bash scripts/release.sh`，详见 [发布工程](docs/release-engineering.md)。CI 已配置 JDK 17／21，但远端尚未执行；配置不代表支持矩阵已经验收。
 
-验证运行环境：JDK 21.0.2、LangChain4j 1.20.0、Spring Boot 4.1.1。最新通过数量与验收缺口见 [生产验收清单](docs/production-readiness.md)，原始结果保存在各模块 `target/surefire-reports` 和 `target/failsafe-reports`。
+本轮选择性验证运行环境：JDK 21.0.4、LangChain4j 1.20.0、Spring Boot 4.1.1。最新通过数量、未执行范围与验收缺口见 [生产验收清单](docs/production-readiness.md)，原始结果保存在各模块 `target/surefire-reports` 和 `target/failsafe-reports`。
 
 `bash scripts/verify.sh` 执行 `clean verify`：清除旧构建输出，运行 core／Agent 单元测试、打包 Agent 和 demo，再由 Failsafe 为每个集成场景启动新的 JVM。覆盖无 Agent 对照、合法放行、输入／输出拒绝、工具副作用计数、吞异常的业务 handler、工具返回检测、异步路径、并发调度、回调／reactive 流、外部配置和日志不含测试敏感标记。
 

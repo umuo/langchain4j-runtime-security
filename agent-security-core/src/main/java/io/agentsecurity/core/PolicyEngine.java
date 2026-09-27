@@ -1,5 +1,6 @@
 package io.agentsecurity.core;
 
+import io.agentsecurity.core.delegation.DelegationGuard;
 import java.util.List;
 import java.util.function.BiConsumer;
 
@@ -53,7 +54,7 @@ public final class PolicyEngine implements AutoCloseable {
 
     /** 所有检测器共享同一个截止时间；检测或审计失败均抛出可识别的阻断异常。 */
     public void check(SecurityEvent event) {
-        Decision decision = Decision.allow();
+        Decision decision = DelegationGuard.evaluate(event);
         long deadline = System.nanoTime() + limits.timeout().toNanos();
         if (executor.isClosed()) {
             decision = Decision.deny("detector-closed");
@@ -86,6 +87,10 @@ public final class PolicyEngine implements AutoCloseable {
             if (!decision.allowed()) {
                 break;
             }
+        }
+        // 检测器可能耗时，放行前再次确认父任务及委托没有失效。
+        if (decision.allowed()) {
+            decision = DelegationGuard.evaluate(event);
         }
         // 审计成功是放行的前置条件，写入失败时不得继续执行受保护操作。
         try {

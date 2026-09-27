@@ -111,13 +111,19 @@ final class AgentBootstrap {
                     // names.
                     synchronized (System.err) {
                         System.err.printf(
-                                "[agent-security] event=%s run=%s decision=%s phase=%s rule=%s policy=%s%n",
+                                "[agent-security] event=%s run=%s decision=%s phase=%s rule=%s policy=%s invocation=%s parent=%s%n",
                                 event.id(),
                                 event.context() == null ? "none" : event.context().runId(),
                                 decision.allowed() ? "ALLOW" : "DENY",
                                 event.phase(),
                                 decision.ruleId(),
-                                policyVersion);
+                                policyVersion,
+                                event.context() == null || event.context().invocation() == null
+                                        ? "none"
+                                        : event.context().invocation().invocationId(),
+                                event.context() == null || event.context().invocation() == null
+                                        ? "none"
+                                        : event.context().invocation().parentInvocationId());
                         if (System.err.checkError()) {
                             throw new IllegalStateException("Audit stderr failed");
                         }

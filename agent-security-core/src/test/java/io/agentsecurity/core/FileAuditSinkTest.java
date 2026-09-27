@@ -97,7 +97,7 @@ class FileAuditSinkTest {
                                 s ->
                                         s.startsWith("{")
                                                 && s.endsWith("}")
-                                                && s.contains("\"schemaVersion\":2")));
+                                                && s.contains("\"schemaVersion\":3")));
         try (var engine = new PolicyEngine(List.of(), sink)) {
             assertEquals(
                     "audit-error",

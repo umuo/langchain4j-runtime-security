@@ -22,9 +22,12 @@ public final class LocalPolicy implements Detector {
 
     private final int maxChars;
 
+    private final boolean requireAgent;
+
     public LocalPolicy(Properties properties) {
         Set<String> known =
                 Set.of(
+                        "agent.context.required",
                         "deny.tools",
                         "allow.tools",
                         "allow.retrievers",
@@ -38,6 +41,11 @@ public final class LocalPolicy implements Detector {
                 throw new IllegalArgumentException("Unknown policy property: " + key);
             }
         }
+        String require = properties.getProperty("agent.context.required", "false");
+        if (!require.equals("true") && !require.equals("false")) {
+            throw new IllegalArgumentException("Invalid agent.context.required");
+        }
+        requireAgent = Boolean.parseBoolean(require);
         deniedTools = Set.copyOf(split(properties.getProperty("deny.tools", "")));
         allowedTools =
                 properties.containsKey("allow.tools")
@@ -86,6 +94,9 @@ public final class LocalPolicy implements Detector {
 
     @Override
     public Decision evaluate(SecurityEvent event) {
+        if (requireAgent && (event.context() == null || event.context().invocation() == null)) {
+            return Decision.deny("missing-agent-context");
+        }
         String permission = memoryPermissions.get(event.phase());
         if (permission != null) {
             if (event.context() == null) {

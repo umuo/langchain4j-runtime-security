@@ -38,6 +38,10 @@ public record SecurityEvent(
     }
 
     public enum Phase {
+        AGENT_START,
+        AGENT_DELEGATE,
+        AGENT_FINISH,
+        AGENT_REVOKE,
         MODEL_INPUT,
         MODEL_OUTPUT,
         TOOL_INPUT,

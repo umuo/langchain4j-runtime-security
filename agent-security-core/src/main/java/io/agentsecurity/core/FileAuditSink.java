@@ -80,8 +80,9 @@ public final class FileAuditSink implements BiConsumer<SecurityEvent, Decision>,
         }
         String runId = event.context() == null ? "null" : "\"" + event.context().runId() + "\"";
         String line =
-                "{\"schemaVersion\":2,\"runId\":"
+                "{\"schemaVersion\":3,\"runId\":"
                         + runId
+                        + io.agentsecurity.core.delegation.AgentAuditFields.json(event.context())
                         + ",\"time\":\""
                         + Instant.now()
                         + "\",\"eventId\":\""

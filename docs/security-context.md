@@ -2,6 +2,8 @@
 
 内容规则可以只通过 `-javaagent` 接入；用户／租户授权需要应用提供已经验证的身份。Agent 无法从 prompt、工具参数或未经验证的 HTTP header 判断真实身份。
 
+多 Agent 任务应在认证后使用 [AgentRuntime](multi-agent-security.md) 创建委托身份；普通上下文的传播不会自动生成父子关系。
+
 ## 认证入口
 
 业务应用依赖与 Agent 同一构建版本的 `io.agentsecurity:agent-security-core:0.1.0-SNAPSHOT`。在应用完成认证和权限查询后，为每次业务 run 创建上下文：
@@ -98,6 +100,6 @@ Publisher 创建时的空身份也是固定快照，不借用订阅／回调线�
 
 检测器优先使用 `event.context()`，它与事件一起形成不可变快照；不要从 `event.text()` 解析可信身份。SDK 当前只隔离正常应用的请求上下文，不防御能任意执行 JVM 代码的恶意插件。
 
-JSONL schema 2 添加可空 `runId`，用于关联一次 run 内不同保护层的检测。eventId 仍表示单次检测，没有自动去重或 tool-call ID。内置日志不记录 tenantId、principalId、permissions 或文本；业务／插件自己的日志仍由其实现负责。升级日志消费者须同时处理历史 schema 1 与 schema 2，详见 [运行手册](operations.md)。
+JSONL schema 2 添加可空 `runId`，用于关联一次 run 内不同保护层的检测。eventId 仍表示单次检测，没有自动去重或 tool-call ID。内置日志不记录 tenantId、principalId、permissions 或文本；业务／插件自己的日志仍由其实现负责。升级日志消费者须同时处理历史 schema 1 与 schema 2，详见 [运行手册](operations.md)。当前 schema 3 另增加委托执行字段，兼容说明见 [多 Agent 安全](multi-agent-security.md)。
 
 本地测试覆盖身份缺失、权限缺失、参数伪造、同步／异步 AI Services、默认／自定义并发工具执行器、两个租户重叠执行、流式回调／Flow、异步完成线程带另一身份、异常回调和作用域恢复。测试矩阵仍限于当前固定版本，不构成任意第三方异步组件的兼容承诺。

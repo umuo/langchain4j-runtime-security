@@ -7,6 +7,7 @@ Java 主代码和测试代码统一使用四空格缩进、UTF-8 和 LF 换行�
 | 目录或包 | 职责 |
 | --- | --- |
 | `agent-security-core / io.agentsecurity.core` | 对外 SDK、检测器 SPI、策略执行、身份上下文和审计 |
+| `core.delegation` | 同 JVM 的父子执行登记、权限收窄、有效性检查与生命周期 |
 | `agent-security-policy / io.agentsecurity.policy` | 工具参数策略和严格 JSON 解析 |
 | `agent-security-javaagent / io.agentsecurity.agent` | `premain` 入口与启动配置 |
 | `agent.instrumentation` | Byte Buddy 匹配、注册及插桩失败处理 |

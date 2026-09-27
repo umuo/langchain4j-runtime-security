@@ -100,6 +100,10 @@ public class BootFixture implements ApplicationRunner {
     @Override
     public void run(ApplicationArguments args) throws Exception {
         String scenario = args.getOptionValues("scenario").get(0);
+        if (scenario.startsWith("delegation-")) {
+            DelegationFixture.run(scenario);
+            return;
+        }
         if (scenario.startsWith("context-")) {
             ContextFixture.run(scenario);
             return;

@@ -45,11 +45,11 @@ SDK 抛出 `SecurityBlockedException`，`ruleId()` 是稳定原因标识。异�
 
 ## 审计语义和故障恢复
 
-日志逐条 JSONL，当前 `schemaVersion=2`，包含 UTC 时间、随机 `eventId`、可空 `runId`、阶段、决策、规则 ID、策略版本。`runId` 来自 SDK 上下文，未接入身份时为 null；同一上下文的保护层共享 runId，各次检测仍有独立 eventId。重复保护层不会自动合并。内置实现不写入事件内容、工具名、用户／租户标识或权限；插件必须返回固定规则 ID，不能将敏感数据编码进 ID。
+日志逐条 JSONL，当前 `schemaVersion=3`，包含 UTC 时间、随机 `eventId`、可空 `runId`、阶段、决策、规则 ID、策略版本。`runId` 来自 SDK 上下文，未接入身份时为 null；同一上下文的保护层共享 runId，各次检测仍有独立 eventId。重复保护层不会自动合并。内置实现不写入事件内容、工具名、用户／租户标识或权限；插件必须返回固定规则 ID，不能将敏感数据编码进 ID。
 
-升级前更新日志消费者以同时接受历史 schema 1（没有 runId）与 schema 2（runId 可空）；保留历史记录，不把缺失字段推断为用户身份。SDK 与 Agent 应使用同一构建版本，应用及插件重新编译验证；当前 SNAPSHOT 不承诺二进制兼容。
+升级前更新日志消费者以同时接受历史 schema 1（没有 runId）、schema 2（runId 可空）与 schema 3（新增委托字段）；保留历史记录，不把缺失字段推断为用户身份。SDK 与 Agent 应使用同一构建版本，应用及插件重新编译验证；当前 SNAPSHOT 不承诺二进制兼容。
 
-RAG 新增 `RETRIEVAL_INPUT`、`RETRIEVAL_OUTPUT`、`AUGMENTATION_INPUT`、`AUGMENTATION_OUTPUT` 四个 phase。日志消费者和插件需接受这些值；消息结构仍为 schema 2。检索器／增强器包装可能产生重复检测，不用事件数量推断实际数据库读取数。
+RAG 新增 `RETRIEVAL_INPUT`、`RETRIEVAL_OUTPUT`、`AUGMENTATION_INPUT`、`AUGMENTATION_OUTPUT` 四个 phase。日志消费者和插件需接受这些值；当前消息结构为 schema 3。检索器／增强器包装可能产生重复检测，不用事件数量推断实际数据库读取数。
 
 Memory 新增 `MEMORY_READ_INPUT`、`MEMORY_READ_OUTPUT`、`MEMORY_WRITE`、`MEMORY_DELETE`。写入／删除事件在执行前记录，不代表存储操作成功。memory ID 仅通过事件 `resource()` 供插件授权，内置审计不写入该字段；不能从日志缺少 ID 推断已实施逐会话 ACL。
 
@@ -64,3 +64,8 @@ Memory 新增 `MEMORY_READ_INPUT`、`MEMORY_READ_OUTPUT`、`MEMORY_WRITE`、`MEM
 策略在启动时加载。更新时为规则集分配新的 `policy.version`，配合固定 Agent JAR 和依赖版本进行灰度；保留上一组已经验证的 Agent 与配置作为回退单元。回退也必须保留安全 Agent，不能通过移除 `-javaagent` 获得表面上的恢复成功。当前不支持远程热更新、动态 attach 或无需重启的卸载。
 
 如果停止进程时仍有工具正在执行，SDK 不能撤销已产生的外部副作用。流式模式在校验前缓冲内容，会增加首字延迟；不适用于要求未经检查的 token 立即展示的产品行为。
+
+
+## 多 Agent 审计 schema 3
+
+当前 FileAuditSink 输出 schema 3，在 runId 之外增加 agentId、invocationId、parentInvocationId、delegationId；普通请求为 null。原 schema 1／2 日志仍需保留兼容处理。任务生命周期增加 AGENT_START、AGENT_DELEGATE、AGENT_FINISH、AGENT_REVOKE，runtime 生命周期与 Agent 决策日志应分别写入文件并关联查询。完整迁移及生命周期语义见 [多 Agent 安全](multi-agent-security.md)。

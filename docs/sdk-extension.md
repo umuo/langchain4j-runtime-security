@@ -1,5 +1,7 @@
 # SDK 扩展指南：为业务项目编写专属安全策略
 
+多 Agent 的父子身份、权限收窄和生命周期接入见 [多 Agent 安全](multi-agent-security.md)。
+
 本文面向已有 LangChain4j 项目的开发者，说明当前仓库实际提供哪些扩展能力，以及如何把项目专属策略打成 JAR 并接入应用。示例基于 `0.1.0-SNAPSHOT`，Agent 固定适配 LangChain4j **1.20.0**；SDK、Agent、策略插件应使用同一份构建产物，不能仅凭相同的 SNAPSHOT 版本号判断兼容。
 
 **最常用的方式：实现 `Detector` → 注册 Java SPI → 把策略 JAR 加入应用依赖 → 使用 `-javaagent` 启动。** 普通 Java 和 Spring Boot 均可使用。涉及用户／租户权限时，再在认证入口提供可信身份。
@@ -303,10 +305,12 @@ try (var scope = SecurityContexts.open(context)) {
 | `phase()` | 当前检查阶段 | 必须先判断阶段，再解释 `operation` 和 `text` |
 | `operation()` | 工具名或框架组件标签等 | 不是统一 URL、资源 ID，也不是可信身份 |
 | `text()` | 适配器提取的待检测文本 | 可能含敏感内容；不是完整框架对象或统一 JSON 信封；自行构造事件时可以为 null |
-| `context()` | 可空的可信身份快照 | 包含 `runId`、tenantId、principalId 和 permissions；由应用认证入口建立 |
+| `context()` | 可空的可信身份快照 | 包含 `runId`、tenantId、principalId、permissions，以及可空 invocation 委托句柄；由可信入口建立 |
 | `resource()` | 可空的资源引用 | 当前自动适配主要用于 Memory；资源 ID 不证明资源归属 |
 
 检测器优先使用 `event.context()`，不要假设请求的 ThreadLocal、Spring Security 上下文或数据库事务会被带入检测线程。不要直接记录 `text`、`resource.id`、身份或工具参数。
+
+运行时另有 AGENT_START／AGENT_DELEGATE／AGENT_FINISH／AGENT_REVOKE 生命周期阶段，由 AgentRuntime 的审计消费者接收，不会自动送入应用 Detector 链。
 
 ### 5.2 各阶段可见内容
 
