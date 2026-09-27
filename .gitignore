@@ -1,0 +1,11 @@
+target/
+.cache/
+*.log
+*.jsonl
+*.jsonl.*
+/var/
+.idea/
+*.iml
+__pycache__/
+/site/
+/.venv-docs/

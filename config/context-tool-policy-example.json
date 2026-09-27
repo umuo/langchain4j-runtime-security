@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "permissions": {"lookup": ["customers:read"]},
+  "tools": {
+    "lookup": {
+      "type": "object",
+      "required": ["tenantId"],
+      "properties": {"tenantId": {"type": "string", "equalsContext": "tenantId"}}
+    }
+  }
+}
