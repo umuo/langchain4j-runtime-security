@@ -29,7 +29,11 @@ plugins:
       lang: [zh, en]
 markdown_extensions:
   - admonition
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.highlight
   - toc:
       permalink: true
@@ -47,6 +51,7 @@ validation:
 nav:
   - 首页: index.md
   - 入门:
+      - 图解框架原理: architecture-explained.md
       - 项目概览与快速运行: overview.md
   - 安全接入:
       - SDK 扩展与专属策略: sdk-extension.md

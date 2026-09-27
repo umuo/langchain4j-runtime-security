@@ -9,6 +9,8 @@ Agent Security 将独立安全 SDK 与 Java Agent 自动插桩结合，在 LangC
 
 ## 从这里开始
 
+如果源码暂时看不进去，先看 [图解架构与调用过程](architecture-explained.md)，用工具执行计数理解放行和阻断。
+
 1. 阅读[项目概览与快速运行](overview.md)，运行无 Agent／启用 Agent 的对照演示。
 2. 使用[工具策略](tool-policy.md)限制可执行工具和参数。
 3. 需要用户或租户权限时，接入[可信身份上下文](security-context.md)。
@@ -18,6 +20,7 @@ Agent Security 将独立安全 SDK 与 Java Agent 自动插桩结合，在 LangC
 
 | 场景 | 文档 |
 | --- | --- |
+| 先看架构图，理解检查、执行和结果交付 | [图解框架原理](architecture-explained.md) |
 | 从示例入手，逐步跟踪拦截与检测源码 | [源码学习指南](source-learning.md) |
 | 编写项目专属策略、插件注册、自定义审计 | [SDK 扩展指南](sdk-extension.md) |
 | 工具准入、参数校验、执行前拦截 | [工具权限与参数规则](tool-policy.md) |
