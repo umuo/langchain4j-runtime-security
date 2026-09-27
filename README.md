@@ -58,7 +58,7 @@ java -javaagent:/absolute/path/agent-security-javaagent.jar=/absolute/path/polic
   -jar your-app.jar
 ```
 
-无需添加 LangChain4j 包装代码。必须保证运行路径位于下表的支持范围内。Spring Boot 3.5.16 可执行 JAR（nested JAR ClassLoader）与应用检测器 SPI 已有测试；自定义隔离 ClassLoader、JPMS、GraalVM native image 尚未验证。Agent 必须早于任何会加载 LangChain4j 类的其他 Agent；发现类已加载时拒绝启动，防止遗漏插桩。
+无需添加 LangChain4j 包装代码。必须保证运行路径位于下表的支持范围内。Spring Boot 4.1.1 可执行 JAR（nested JAR ClassLoader）与应用检测器 SPI 已有测试；自定义隔离 ClassLoader、JPMS、GraalVM native image 尚未验证。Agent 必须早于任何会加载 LangChain4j 类的其他 Agent；发现类已加载时拒绝启动，防止遗漏插桩。
 
 ## 当前覆盖范围
 
@@ -206,7 +206,7 @@ audit.queue.capacity=128
 
 带 SBOM、隔离重建比对和 SHA-256 交付清单的流程：`bash scripts/release.sh`，详见 [发布工程](docs/release-engineering.md)。CI 已配置 JDK 17／21，但远端尚未执行；配置不代表支持矩阵已经验收。
 
-验证运行环境：JDK 21.0.2、LangChain4j 1.20.0、Spring Boot 3.5.16。最新通过数量与验收缺口见 [生产验收清单](docs/production-readiness.md)，原始结果保存在各模块 `target/surefire-reports` 和 `target/failsafe-reports`。
+验证运行环境：JDK 21.0.2、LangChain4j 1.20.0、Spring Boot 4.1.1。最新通过数量与验收缺口见 [生产验收清单](docs/production-readiness.md)，原始结果保存在各模块 `target/surefire-reports` 和 `target/failsafe-reports`。
 
 `bash scripts/verify.sh` 执行 `clean verify`：清除旧构建输出，运行 core／Agent 单元测试、打包 Agent 和 demo，再由 Failsafe 为每个集成场景启动新的 JVM。覆盖无 Agent 对照、合法放行、输入／输出拒绝、工具副作用计数、吞异常的业务 handler、工具返回检测、异步路径、并发调度、回调／reactive 流、外部配置和日志不含测试敏感标记。
 
@@ -234,6 +234,8 @@ Reactive Publisher 保持冷订阅：仅创建 Publisher 不启动模型请求�
 固定事件类型包括正文、thinking、工具参数片段、完整工具调用、已知原始控制事件和最终响应。上游必须在一个 `CompleteResponse` 之后结束；缺少最终响应、重复最终响应、最终响应之后继续发送事件均拒绝。未知事件不会未经检查传递。该适配面向模型的 `ChatModelStreamingEvent`；不宣称已直接检查 AI Services 的全部高层事件或任意第三方 Publisher。
 
 超时工作与用户通知使用独立、受并发上限约束的线程池，避免用户回调阻塞唯一计时线程。插件检测和 Agent 审计各有有界执行器和等待期限；策略检查可能阻塞调用线程至这两个预算耗尽，不是全异步调度。Subscriber 必须遵守 Flow 非阻塞回调契约；不能强制中断阻塞的用户代码。测试覆盖并发／重入 request、取消、慢回调及一次终止，但尚未通过独立 Reactive Streams TCK 或长期并发压力验收。
+
+代码布局、中文注释约定和自动格式检查见 [开发规范](docs/development.md)。
 
 ## 文档 Wiki
 

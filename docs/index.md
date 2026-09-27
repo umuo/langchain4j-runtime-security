@@ -24,6 +24,7 @@ Agent Security 将独立安全 SDK 与 Java Agent 自动插桩结合，在 LangC
 | 历史消息读写、删除授权、会话资源权限 | [Memory 会话安全](memory-security.md) |
 | 部署配置、拒绝原因、审计与恢复 | [运行与故障恢复](operations.md) |
 | CI、SBOM、交付证据、可重复构建 | [构建与发布工程](release-engineering.md) |
+| 代码布局、格式检查与中文注释约定 | [开发规范](development.md) |
 | 技术选型及原型设计背景 | [技术调研](langchain4j-runtime-security-spike.md) |
 
 ## 配置示例

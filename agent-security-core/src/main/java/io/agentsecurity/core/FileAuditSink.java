@@ -1,5 +1,7 @@
 package io.agentsecurity.core;
 
+import static java.nio.file.StandardOpenOption.*;
+
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.ByteBuffer;
@@ -10,27 +12,46 @@ import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Instant;
 import java.util.function.BiConsumer;
-import static java.nio.file.StandardOpenOption.*;
 
-/** Bounded JSONL decision journal. No payloads, tool names, identities or plugin exception text. */
+/** 脱敏 JSONL 文件审计，支持独占锁和有界轮转；决策记录不代表外部副作用已经成功。 */
 public final class FileAuditSink implements BiConsumer<SecurityEvent, Decision>, AutoCloseable {
+
     private final Path path;
+
     private final long maxBytes;
+
     private final int backups;
+
     private final boolean force;
+
     private final String policyVersion;
+
     private final FileChannel lockChannel;
+
     private final FileLock lock;
+
     private FileChannel output;
+
     private boolean closed;
+
     private boolean failed;
 
-    public FileAuditSink(Path path, long maxBytes, int backups, boolean force, String policyVersion) throws IOException {
-        if (maxBytes < 1024 || maxBytes > (1L << 40)) throw new IllegalArgumentException("Invalid audit.max.bytes");
-        if (backups < 1 || backups > 100) throw new IllegalArgumentException("Invalid audit.backups");
-        if (policyVersion == null || !policyVersion.matches("[a-zA-Z0-9_.-]{1,80}")) throw new IllegalArgumentException("Invalid policy.version");
-        this.path = path.toAbsolutePath().normalize(); this.maxBytes = maxBytes; this.backups = backups;
-        this.force = force; this.policyVersion = policyVersion;
+    public FileAuditSink(Path path, long maxBytes, int backups, boolean force, String policyVersion)
+            throws IOException {
+        if (maxBytes < 1024 || maxBytes > (1L << 40)) {
+            throw new IllegalArgumentException("Invalid audit.max.bytes");
+        }
+        if (backups < 1 || backups > 100) {
+            throw new IllegalArgumentException("Invalid audit.backups");
+        }
+        if (policyVersion == null || !policyVersion.matches("[a-zA-Z0-9_.-]{1,80}")) {
+            throw new IllegalArgumentException("Invalid policy.version");
+        }
+        this.path = path.toAbsolutePath().normalize();
+        this.maxBytes = maxBytes;
+        this.backups = backups;
+        this.force = force;
+        this.policyVersion = policyVersion;
         Files.createDirectories(this.path.getParent());
         Path lockPath = this.path.resolveSibling(this.path.getFileName() + ".lock");
         createPrivateFile(lockPath);
@@ -38,46 +59,81 @@ public final class FileAuditSink implements BiConsumer<SecurityEvent, Decision>,
         FileLock acquired = null;
         try {
             acquired = lockChannel.tryLock();
-            if (acquired == null) throw new IOException("Audit journal is already in use");
+            if (acquired == null) {
+                throw new IOException("Audit journal is already in use");
+            }
             lock = acquired;
             output = openOutput();
         } catch (IOException | RuntimeException error) {
-            if (acquired != null) acquired.close();
+            if (acquired != null) {
+                acquired.close();
+            }
             lockChannel.close();
             throw error;
         }
     }
 
-    @Override public synchronized void accept(SecurityEvent event, Decision decision) {
-        if (closed || failed) throw new IllegalStateException("Audit journal unavailable");
+    @Override
+    public synchronized void accept(SecurityEvent event, Decision decision) {
+        if (closed || failed) {
+            throw new IllegalStateException("Audit journal unavailable");
+        }
         String runId = event.context() == null ? "null" : "\"" + event.context().runId() + "\"";
-        String line = "{\"schemaVersion\":2,\"runId\":" + runId + ",\"time\":\"" + Instant.now() + "\",\"eventId\":\"" + event.id()
-                + "\",\"phase\":\"" + event.phase() + "\",\"decision\":\"" + (decision.allowed() ? "ALLOW" : "DENY")
-                + "\",\"ruleId\":\"" + decision.ruleId() + "\",\"policyVersion\":\"" + policyVersion + "\"}\n";
+        String line =
+                "{\"schemaVersion\":2,\"runId\":"
+                        + runId
+                        + ",\"time\":\""
+                        + Instant.now()
+                        + "\",\"eventId\":\""
+                        + event.id()
+                        + "\",\"phase\":\""
+                        + event.phase()
+                        + "\",\"decision\":\""
+                        + (decision.allowed() ? "ALLOW" : "DENY")
+                        + "\",\"ruleId\":\""
+                        + decision.ruleId()
+                        + "\",\"policyVersion\":\""
+                        + policyVersion
+                        + "\"}\n";
         byte[] bytes = line.getBytes(StandardCharsets.UTF_8);
         try {
-            if (output.size() + bytes.length > maxBytes) rotate();
+            if (output.size() + bytes.length > maxBytes) {
+                rotate();
+            }
             ByteBuffer buffer = ByteBuffer.wrap(bytes);
-            while (buffer.hasRemaining()) output.write(buffer);
-            if (force) output.force(true);
+            while (buffer.hasRemaining()) {
+                output.write(buffer);
+            }
+            if (force) {
+                output.force(true);
+            }
         } catch (IOException e) {
-            failed = true; // A partial record or failed rotation must never be followed by more accepted records.
+            // A partial record or failed rotation must never be followed by more accepted records.
+            failed = true;
             throw new UncheckedIOException("audit-write-failed", e);
         }
     }
 
     private void rotate() throws IOException {
-        for (int index = 1; index <= backups; index++) validateRegular(backup(index));
-        if (force) output.force(true);
+        for (int index = 1; index <= backups; index++) {
+            validateRegular(backup(index));
+        }
+        if (force) {
+            output.force(true);
+        }
         output.close();
-        for (int index = backups; index >= 2; index--)
-            if (Files.exists(backup(index - 1), LinkOption.NOFOLLOW_LINKS))
+        for (int index = backups; index >= 2; index--) {
+            if (Files.exists(backup(index - 1), LinkOption.NOFOLLOW_LINKS)) {
                 Files.move(backup(index - 1), backup(index), StandardCopyOption.REPLACE_EXISTING);
+            }
+        }
         Files.move(path, backup(1), StandardCopyOption.REPLACE_EXISTING);
         output = openOutput();
     }
 
-    private Path backup(int index) { return path.resolveSibling(path.getFileName() + "." + index); }
+    private Path backup(int index) {
+        return path.resolveSibling(path.getFileName() + "." + index);
+    }
 
     private FileChannel openOutput() throws IOException {
         createPrivateFile(path);
@@ -85,24 +141,46 @@ public final class FileAuditSink implements BiConsumer<SecurityEvent, Decision>,
     }
 
     private static void validateRegular(Path file) throws IOException {
-        if (Files.exists(file, LinkOption.NOFOLLOW_LINKS) && !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS))
+        if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)
+                && !Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("Audit paths must be regular files");
+        }
     }
 
     private static void createPrivateFile(Path file) throws IOException {
         validateRegular(file);
-        if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) return;
+        if (Files.exists(file, LinkOption.NOFOLLOW_LINKS)) {
+            return;
+        }
         try {
-            Files.createFile(file, PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------")));
+            Files.createFile(
+                    file,
+                    PosixFilePermissions.asFileAttribute(
+                            PosixFilePermissions.fromString("rw-------")));
         } catch (UnsupportedOperationException e) {
-            Files.createFile(file); // Windows access follows the parent directory ACL.
-        } catch (FileAlreadyExistsException e) { validateRegular(file); }
+            // Windows access follows the parent directory ACL.
+            Files.createFile(file);
+        } catch (FileAlreadyExistsException e) {
+            validateRegular(file);
+        }
     }
 
-    @Override public synchronized void close() throws IOException {
-        if (closed) return;
+    @Override
+    public synchronized void close() throws IOException {
+        if (closed) {
+            return;
+        }
         closed = true;
-        try { if (output != null) output.close(); }
-        finally { try { lock.close(); } finally { lockChannel.close(); } }
+        try {
+            if (output != null) {
+                output.close();
+            }
+        } finally {
+            try {
+                lock.close();
+            } finally {
+                lockChannel.close();
+            }
+        }
     }
 }

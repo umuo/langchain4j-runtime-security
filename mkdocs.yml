@@ -58,5 +58,6 @@ nav:
       - 构建与发布工程: release-engineering.md
       - 生产验收清单: production-readiness.md
   - 设计与维护:
+      - 开发规范与代码布局: development.md
       - 技术调研与方案边界: langchain4j-runtime-security-spike.md
       - Wiki 维护指南: wiki-maintenance.md
