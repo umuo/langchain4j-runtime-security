@@ -13,4 +13,7 @@ public record TelemetryRecord(
         long durationNanos,
         UUID runId,
         UUID invocationId,
-        UUID parentInvocationId) {}
+        UUID parentInvocationId,
+        int depth,
+        io.agentsecurity.core.delegation.AgentEndReason endReason,
+        long lifetimeNanos) {}

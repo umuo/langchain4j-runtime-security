@@ -22,6 +22,9 @@ public final class AgentRuntime implements AutoCloseable {
     private final AgentRuntimeLimits limits;
     private final BoundedAuditSink audit;
     private final SecurityTelemetry telemetry;
+    private final java.util.concurrent.ScheduledExecutorService expiry;
+    private final java.util.EnumMap<AgentEndReason, Long> ended =
+            new java.util.EnumMap<>(AgentEndReason.class);
     private boolean closed;
     private boolean auditFailed;
 
@@ -56,6 +59,25 @@ public final class AgentRuntime implements AutoCloseable {
         }
         this.definitions = Map.copyOf(registry);
         this.audit = new BoundedAuditSink(audit, Duration.ofSeconds(1), 128);
+        expiry =
+                java.util.concurrent.Executors.newSingleThreadScheduledExecutor(
+                        task -> {
+                            var thread = new Thread(task, "agent-security-expiry");
+                            thread.setDaemon(true);
+                            thread.setContextClassLoader(AgentRuntime.class.getClassLoader());
+                            return thread;
+                        });
+        expiry.scheduleWithFixedDelay(
+                () -> {
+                    try {
+                        expireNow();
+                    } catch (SecurityBlockedException auditError) {
+                        /* 已失效所有登记，后续安全操作继续拒绝。 */
+                    }
+                },
+                100,
+                100,
+                java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     /** 仅供可信认证入口调用；authorizedGrant 必须先经业务授权，方法本身不验证登录凭证。 */
@@ -127,6 +149,7 @@ public final class AgentRuntime implements AutoCloseable {
         }
         for (var node = invocation; node != null; node = node.parent) {
             if (System.nanoTime() - node.deadline >= 0) {
+                expireNow();
                 throw new SecurityBlockedException("agent-invocation-expired");
             }
             if (active.get(node.invocationId()) != node) {
@@ -136,8 +159,7 @@ public final class AgentRuntime implements AutoCloseable {
     }
 
     private AgentInvocation register(AgentInvocation invocation, SecurityEvent.Phase phase) {
-        // 没有定时清扫线程；新建时回收过期树，检查时也逐级验证截止时间。
-        active.values().removeIf(node -> expired(node));
+        expireNow();
         if (active.size() >= limits.maxInvocations()) {
             throw new SecurityBlockedException("agent-capacity");
         }
@@ -147,7 +169,13 @@ public final class AgentRuntime implements AutoCloseable {
             requireActive(invocation.context());
             return invocation;
         } catch (RuntimeException error) {
-            active.remove(invocation.invocationId());
+            if (auditFailed) {
+                try {
+                    terminate(List.copyOf(active.values()), node -> AgentEndReason.AUDIT_FAILED);
+                } catch (RuntimeException cleanupError) {
+                    error.addSuppressed(cleanupError);
+                }
+            }
             throw error;
         }
     }
@@ -161,15 +189,90 @@ public final class AgentRuntime implements AutoCloseable {
         return false;
     }
 
-    synchronized void finish(AgentInvocation invocation, boolean revoked) {
+    /** 活跃委托快照按当前截止时间计算，不依赖遥测队列是否丢记录。 */
+    public record Snapshot(int activeInvocations, int maxDepth, Map<AgentEndReason, Long> ended) {}
+
+    public synchronized Snapshot snapshot() {
+        var live = active.values().stream().filter(node -> !expired(node)).toList();
+        return new Snapshot(
+                live.size(),
+                live.stream().mapToInt(node -> node.depth).max().orElse(0),
+                Map.copyOf(ended));
+    }
+
+    /** 可由宿主主动触发；默认后台每 100ms 尝试清理，权限检查始终独立校验实际截止时间。 */
+    public synchronized int expireNow() {
+        if (closed) {
+            return 0;
+        }
+        var expired = active.values().stream().filter(this::expired).toList();
+        terminate(expired, node -> AgentEndReason.EXPIRED);
+        return expired.size();
+    }
+
+    synchronized void finish(AgentInvocation invocation, AgentEndReason reason) {
         if (active.get(invocation.invocationId()) != invocation) {
             return;
         }
-        // 先失效整棵子树，即使后续审计失败也不能恢复委托。
-        active.values().removeIf(node -> descendant(node, invocation));
-        emit(
-                invocation,
-                revoked ? SecurityEvent.Phase.AGENT_REVOKE : SecurityEvent.Phase.AGENT_FINISH);
+        expireNow();
+        if (active.get(invocation.invocationId()) != invocation) {
+            return;
+        }
+        var subtree =
+                active.values().stream().filter(node -> descendant(node, invocation)).toList();
+        terminate(
+                subtree,
+                node ->
+                        node == invocation
+                                ? reason
+                                : reason == AgentEndReason.COMPLETED
+                                                || reason == AgentEndReason.RELEASED
+                                        ? AgentEndReason.PARENT_FINISHED
+                                        : AgentEndReason.PARENT_REVOKED);
+    }
+
+    /** 先原子失效整批，再逐条审计；审计故障不会让尚未写入日志的后代保留权限。 */
+    private void terminate(
+            List<AgentInvocation> nodes,
+            java.util.function.Function<AgentInvocation, AgentEndReason> reasons) {
+        long now = System.nanoTime();
+        var ordered =
+                nodes.stream()
+                        .sorted(java.util.Comparator.comparingInt(node -> node.depth))
+                        .toList();
+        for (var node : ordered) {
+            active.remove(node.invocationId());
+            node.end(reasons.apply(node), now);
+            ended.merge(node.endReason(), 1L, Long::sum);
+        }
+        RuntimeException failure = null;
+        for (var node : ordered) {
+            try {
+                var phase =
+                        node.endReason() == AgentEndReason.EXPIRED
+                                ? SecurityEvent.Phase.AGENT_EXPIRE
+                                : node.endReason() == AgentEndReason.COMPLETED
+                                                || node.endReason() == AgentEndReason.RELEASED
+                                                || node.endReason() == AgentEndReason.FAILED
+                                        ? SecurityEvent.Phase.AGENT_FINISH
+                                        : SecurityEvent.Phase.AGENT_REVOKE;
+                emit(node, phase);
+            } catch (RuntimeException error) {
+                if (failure == null) {
+                    failure = error;
+                }
+            }
+        }
+        if (failure != null) {
+            if (!active.isEmpty()) {
+                try {
+                    terminate(List.copyOf(active.values()), node -> AgentEndReason.AUDIT_FAILED);
+                } catch (RuntimeException cleanupError) {
+                    failure.addSuppressed(cleanupError);
+                }
+            }
+            throw failure;
+        }
     }
 
     private boolean descendant(AgentInvocation node, AgentInvocation ancestor) {
@@ -188,7 +291,18 @@ public final class AgentRuntime implements AutoCloseable {
         long started = System.nanoTime();
         var outcome = SecurityTelemetry.Outcome.ALLOW;
         try {
-            audit.accept(event, Decision.allow());
+            audit.accept(
+                    event,
+                    invocation.endReason() == null
+                            ? Decision.allow()
+                            : new Decision(
+                                    true,
+                                    "agent-end-"
+                                            + invocation
+                                                    .endReason()
+                                                    .name()
+                                                    .toLowerCase(java.util.Locale.ROOT)
+                                                    .replace('_', '-')));
         } catch (RuntimeException error) {
             outcome = SecurityTelemetry.Outcome.AUDIT_FAILURE;
             auditFailed = true;
@@ -229,12 +343,9 @@ public final class AgentRuntime implements AutoCloseable {
             return;
         }
         closed = true;
+        expiry.shutdownNow();
         try {
-            for (var invocation : List.copyOf(active.values())) {
-                if (invocation.parent == null) {
-                    finish(invocation, true);
-                }
-            }
+            terminate(List.copyOf(active.values()), node -> AgentEndReason.RUNTIME_CLOSED);
         } finally {
             active.clear();
             audit.close();

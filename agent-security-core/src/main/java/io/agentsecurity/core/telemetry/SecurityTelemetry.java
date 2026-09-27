@@ -49,7 +49,7 @@ public final class SecurityTelemetry {
         sampleEvery = 1;
     }
 
-    /** sampleEvery 为每 N 个事件保留一个关联记录；指标不采样。 */
+    /** sampleEvery 按 run 散列采样；无上下文按事件序号采样。指标不采样。 */
     public SecurityTelemetry(int capacity, int sampleEvery) {
         if (capacity < 1 || capacity > 65536 || sampleEvery < 1 || sampleEvery > 1000000) {
             throw new IllegalArgumentException("Invalid telemetry limits");
@@ -89,11 +89,20 @@ public final class SecurityTelemetry {
                                 ? 1
                                 : duration <= 100000000 ? 2 : duration <= 1000000000 ? 3 : 4;
         buckets.incrementAndGet(index * 5 + bucket);
-        if (Long.remainderUnsigned(sequence.getAndIncrement(), sampleEvery) != 0) {
+        var context = event.context();
+        long samplingKey =
+                context == null
+                        ? sequence.getAndIncrement()
+                        : context.runId().getMostSignificantBits()
+                                ^ context.runId().getLeastSignificantBits();
+        if (Long.remainderUnsigned(samplingKey, sampleEvery) != 0) {
             return;
         }
-        var context = event.context();
         var invocation = context == null ? null : context.invocation();
+        boolean terminal =
+                event.phase() == SecurityEvent.Phase.AGENT_FINISH
+                        || event.phase() == SecurityEvent.Phase.AGENT_REVOKE
+                        || event.phase() == SecurityEvent.Phase.AGENT_EXPIRE;
         var record =
                 new TelemetryRecord(
                         Instant.now(),
@@ -103,7 +112,10 @@ public final class SecurityTelemetry {
                         duration,
                         context == null ? null : context.runId(),
                         invocation == null ? null : invocation.invocationId(),
-                        invocation == null ? null : invocation.parentInvocationId());
+                        invocation == null ? null : invocation.parentInvocationId(),
+                        invocation == null ? 0 : invocation.depth(),
+                        invocation == null || !terminal ? null : invocation.endReason(),
+                        invocation == null || !terminal ? 0 : invocation.lifetimeNanos());
         if (!queue.offer(record)) {
             dropped.incrementAndGet();
         }

@@ -128,7 +128,25 @@ final class DelegationFixture {
         if (!correlated || telemetryRecords.toString().contains("principal-delegation")) {
             throw new IllegalStateException("Telemetry correlation or privacy failure");
         }
-        System.out.println("TELEMETRY_RESULT correlated=" + correlated);
+        var starts =
+                telemetryRecords.stream()
+                        .filter(
+                                record ->
+                                        record.phase() == SecurityEvent.Phase.AGENT_START
+                                                || record.phase()
+                                                        == SecurityEvent.Phase.AGENT_DELEGATE)
+                        .map(record -> record.invocationId())
+                        .collect(java.util.stream.Collectors.toSet());
+        var ends = telemetryRecords.stream().filter(record -> record.endReason() != null).toList();
+        if (ends.size() != starts.size()
+                || !ends.stream()
+                        .map(record -> record.invocationId())
+                        .collect(java.util.stream.Collectors.toSet())
+                        .equals(starts)
+                || ends.stream().anyMatch(record -> record.lifetimeNanos() <= 0)) {
+            throw new IllegalStateException("Incomplete lifecycle records");
+        }
+        System.out.println("TELEMETRY_RESULT correlated=" + correlated + " lifecycleComplete=true");
         System.out.printf(
                 "DELEGATION_RESULT scenario=%s blocked=%s toolCalls=%d restored=%s reason=%s%n",
                 scenario, blocked, calls.get(), SecurityContexts.current() == null, reason);

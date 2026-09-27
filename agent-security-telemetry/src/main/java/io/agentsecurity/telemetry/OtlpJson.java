@@ -56,6 +56,11 @@ final class OtlpJson {
                 attribute(json, "security.run.id", record.runId());
                 attribute(json, "security.invocation.id", record.invocationId());
                 attribute(json, "security.parent.invocation.id", record.parentInvocationId());
+                attribute(json, "security.delegation.depth", record.depth());
+                attribute(json, "security.end.reason", record.endReason());
+                if (record.endReason() != null) {
+                    attribute(json, "security.lifetime.nanos", record.lifetimeNanos());
+                }
                 json.writeStartObject();
                 json.writeStringField("key", "security.duration.nanos");
                 json.writeObjectFieldStart("value");

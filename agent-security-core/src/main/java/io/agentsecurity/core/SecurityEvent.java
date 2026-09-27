@@ -42,6 +42,7 @@ public record SecurityEvent(
         AGENT_DELEGATE,
         AGENT_FINISH,
         AGENT_REVOKE,
+        AGENT_EXPIRE,
         MODEL_INPUT,
         MODEL_OUTPUT,
         TOOL_INPUT,

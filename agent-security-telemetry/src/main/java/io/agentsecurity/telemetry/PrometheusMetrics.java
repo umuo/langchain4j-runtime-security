@@ -68,6 +68,26 @@ public final class PrometheusMetrics {
         return text.toString();
     }
 
+    /** 显式传入一个运行时；多运行时宿主应分别暴露或聚合，不以 run UUID 作为标签。 */
+    public static String render(
+            SecurityTelemetry telemetry,
+            OtlpLogExporter exporter,
+            io.agentsecurity.core.delegation.AgentRuntime runtime) {
+        var text = new StringBuilder(render(telemetry, exporter));
+        var state = runtime.snapshot();
+        scalar(text, "agent_security_invocations_active", "gauge", state.activeInvocations());
+        scalar(text, "agent_security_delegation_depth_max", "gauge", state.maxDepth());
+        text.append("# TYPE agent_security_invocations_ended_total counter\n");
+        for (var reason : io.agentsecurity.core.delegation.AgentEndReason.values()) {
+            text.append("agent_security_invocations_ended_total{reason=\"")
+                    .append(reason.name())
+                    .append("\"} ")
+                    .append(state.ended().getOrDefault(reason, 0L))
+                    .append('\n');
+        }
+        return text.toString();
+    }
+
     private static void scalar(StringBuilder text, String name, String type, long value) {
         text.append("# TYPE ").append(name).append(' ').append(type).append('\n');
         text.append(name).append(' ').append(value).append('\n');

@@ -57,7 +57,15 @@ class SecurityTelemetryTest {
     void samplingOnlyAffectsCorrelationRecords() {
         var telemetry = new SecurityTelemetry(10, 3);
         for (int i = 0; i < 10; i++) {
-            telemetry.record(event(), SecurityTelemetry.Outcome.DENY, 0);
+            telemetry.record(
+                    new SecurityEvent(
+                            java.util.UUID.randomUUID(),
+                            SecurityEvent.Phase.TOOL_INPUT,
+                            "lookup",
+                            "",
+                            null),
+                    SecurityTelemetry.Outcome.DENY,
+                    0);
         }
         assertEquals(10, count(telemetry, SecurityTelemetry.Outcome.DENY));
         assertEquals(4, telemetry.drain(10).size());
@@ -209,7 +217,11 @@ class SecurityTelemetryTest {
                                     SecurityContext.authenticated("tenant", "user", Set.of()),
                                     grant,
                                     Duration.ofSeconds(1)));
-            assertEquals(1, count(telemetry, SecurityTelemetry.Outcome.AUDIT_FAILURE));
+            // 创建审计失败和随后终止登记各有一条失败遥测。
+            assertEquals(2, count(telemetry, SecurityTelemetry.Outcome.AUDIT_FAILURE));
+            var records = telemetry.drain(10);
+            assertEquals(SecurityEvent.Phase.AGENT_START, records.get(0).phase());
+            assertEquals(AgentEndReason.AUDIT_FAILED, records.get(1).endReason());
         }
     }
 

@@ -61,7 +61,8 @@ class DelegationIT {
         }
         String output = Files.readString(log);
         assertEquals(0, process.exitValue(), output);
-        assertTrue(output.contains("TELEMETRY_RESULT correlated=true"), output);
+        assertTrue(
+                output.contains("TELEMETRY_RESULT correlated=true lifecycleComplete=true"), output);
         assertTrue(
                 output.contains(
                         "DELEGATION_RESULT scenario="

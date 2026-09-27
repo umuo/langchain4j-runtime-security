@@ -13,7 +13,7 @@
 
 结果分类为 `ALLOW`、`DENY`、`DETECTOR_FAILURE`、`AUDIT_FAILURE`、`INTERNAL_ERROR`。引擎使用 `audit-error` 和 `detector-` 规则前缀区分故障；插件不要使用这些保留名称表达普通业务拒绝。遥测不导出任意规则名称，因此不会随插件动态规则增加指标维度。定位具体规则请关联原有审计中的事件 UUID。
 
-决策耗时覆盖 `PolicyEngine.check`，包含检测和审计确认；生命周期耗时仅为该次生命周期审计耗时，**不是 Agent 任务总时长**。本版本没有单检测器耗时、活跃 Agent 数、委托深度或完整 span。生命周期沿用 `AgentRuntime` 原有语义：根结束／撤销使子树失效，但不为每个后代补发结束事件，过期采用惰性清理。因此不能靠开始数减结束数计算精确活跃任务数。
+决策耗时覆盖 `PolicyEngine.check`，包含检测和审计确认；生命周期耗时仅为该次生命周期审计耗时，**不是 Agent 任务总时长**。本版本没有单检测器耗时或完整 span。现在每个已登记 Agent 都有独立终止记录，包含 endReason、depth、lifetimeNanos；runtime.snapshot() 提供有效委托数与最大深度。lifetimeNanos 是创建登记至观察到终止的时长，与审计耗时 durationNanos 分开。
 
 ## 独立 SDK 接入
 
@@ -81,7 +81,7 @@ var runtime = new AgentRuntime(definitions, limits, auditSink, telemetry);
 
 `drain` 是破坏性读取，不提供确认、重放或持久化。多个消费者会竞争分配记录；若要向多个后端发送，应由一个消费者读取后再分发。拉取后导出失败不会自动重新入队，也不计入收集器的 `dropped`；导出适配器必须另记失败／丢弃计数。进程退出时内存记录可能丢失。
 
-采样参数 `sampleEvery=10` 表示按并发入队序号每十个事件取一个，不是按完整任务采样，可能出现缺少父节点的调用树。需要尽量完整的关联关系时使用 1，并合理安排消费频率；即便如此队列满、进程退出也会导致缺失。关闭阶段应先停止新业务并等待在途任务，再最后拉取；本版本不承诺退出自动刷新。
+采样参数 `sampleEvery=10` 对有上下文的事件按 run UUID 固定散列选择约 1/10 的 run，同一 run 的父子、决策与生命周期使用同一选择。不同收集器需使用相同采样率才能一致选择；无上下文事件仍按序号采样。指标和安全审计不采样。队列满、竞争消费者和进程退出仍可能造成被选中 run 的记录缺失。关闭阶段应先停止新业务并等待在途任务，再最后拉取；本版本不承诺退出自动刷新。
 
 快照各项计数不是原子事务；并发期间直方图合计与计数可能短暂不一致，静止后收敛。计数为进程内累计值，重启归零。导出 Prometheus 风格累计直方图时，需要将各独立区间累加，不能直接将数组当累计桶。
 
@@ -98,7 +98,7 @@ var runtime = new AgentRuntime(definitions, limits, auditSink, telemetry);
 | 优先级 | 需求 | 验收标准 |
 | --- | --- | --- |
 | P0 | 导出适配器后续验收 | 已有 Prometheus 文本与 OTLP/HTTP 日志；补真实 Collector／监控后端、TLS 和长期断网验收 |
-| P0 | 精确生命周期与调用链 | 每个子任务有明确完成／过期／撤销原因，覆盖异步结束；完整任务采样；可验证活跃数与深度 |
+| P0 | 生命周期后续验收 | 已有逐节点终止、后台过期、run 采样及状态指标；继续验证大子树终止延迟，后续接入完整 span |
 | P0 | 性能和长期压力验收 | 测量启用前后吞吐、P95/P99、堆占用；慢消费者和长时间断网资源有界 |
 | P1 | 检测／审计／插桩健康指标 | 区分检测执行、审计等待、队列饱和与转换失败；说明未覆盖路径 |
 | P1 | 面向业务的安全看板和告警 | 能由拒绝率或超时异常定位 run 和父子执行，并跳转审计规则；配置告警阈值 |
@@ -180,3 +180,9 @@ HTTP 429/502/503/504 与连接故障可有限重试；没有 `Retry-After` 时�
 ### 协议依据与验证范围
 
 实现依据 [OTLP 传输规范](https://opentelemetry.io/docs/specs/otlp/) 的 JSON 日志、部分成功和重试规则，以及 [Prometheus 文本格式](https://prometheus.io/docs/instrumenting/exposition_formats/)。本地测试使用真实 HTTP 客户端和模拟协议端点，覆盖 JSON、认证头、脱敏、临时／永久失败、部分成功、超限、超时与关闭。尚未在真实 Collector、Prometheus 服务和生产 TLS 环境完成端到端验收；不能把协议端点测试写成监控平台验收通过。
+
+### 生命周期状态指标与升级
+
+可使用 `PrometheusMetrics.render(telemetry, exporter, runtime)` 读取单个运行时的有效委托数、最大活跃深度及按原因累计的终止计数。这些值不受日志采样或队列丢弃影响。接入时先关闭 runtime，再等待遥测队列排空，最后关闭 exporter；详细语义见 [多 Agent 生命周期](multi-agent-security.md#8)。
+
+本轮 TelemetryRecord 增加 depth、endReason、lifetimeNanos，SecurityEvent.Phase 增加 AGENT_EXPIRE。升级时应重新编译 SDK、插件及导出适配器，更新严格枚举消费者。JSONL 审计 schema 3 不增加字段，终止原因使用 rule 表达。

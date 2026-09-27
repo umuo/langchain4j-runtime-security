@@ -27,6 +27,8 @@
 
 ## 本地验证证据
 
+2026-09-28 05:41（Asia/Shanghai），生命周期迭代通过完整发布验证：core 60、policy 57、Agent 57、telemetry 13、普通 Java 41、Boot 84，共 **312 项，零失败、零错误、零跳过**。新增逐节点终止、并发终止互斥、取消／拒绝、后台过期、审计失败清空和 run 一致采样验证；Boot 委托场景新增每个节点唯一终止断言。四个运行时 JAR 隔离重建 SHA-256 一致，生成 SBOM。
+
 2026-09-28 05:24（Asia/Shanghai），导出适配器迭代完成 **303 项测试，零失败、零错误、零跳过**：core 52、policy 57、Agent 57、telemetry 12、普通 Java 41、Boot 84。完整 `release.sh` 回归通过后，修正 Prometheus 指标族连续输出，并对 core／telemetry 重新执行 release profile 验证。最终发布包重新执行四个运行时 JAR 的隔离重建和校验；本轮不宣称真实 Collector／Prometheus／TLS 或持续压力验收通过。
 
 2026-09-28 05:11（Asia/Shanghai），`bash scripts/release.sh` 完整通过：core 52、policy 57、Agent 57、普通 Java 41、Boot 84，共 **291 项，零失败、零错误、零跳过**。包含新增 8 项遥测单元测试和加入遥测关联断言的 6 个委托独立 JVM 场景，以及此前未执行的 25 项 HTTP/SSE 测试。生成模块 SBOM，三个运行时 JAR 的隔离源码重建 SHA-256 一致；JDK 为 21.0.4。文档示例按 Java 17 编译并运行通过，Wiki 严格构建通过。以下记录为历史验证，不代表仍有相同阻塞。
@@ -62,4 +64,4 @@ Memory 新增 9 项单元测试和 23 项 Boot 独立 JVM 场景，覆盖读写�
 
 ## 可观测性收集
 
-新增可选 `SecurityTelemetry`，提供固定 phase/outcome 计数、耗时分桶和有界脱敏关联队列；Java Agent 提供 `telemetry.enabled` 开关。可选 telemetry 模块现提供 Prometheus 文本渲染和 OTLP/HTTP JSON 日志导出；完整 span、精确活跃任务数及性能验收仍待完成。详细接入和发展规划见 [可观测性](observability.md)。
+新增可选 `SecurityTelemetry`，提供固定 phase/outcome 计数、耗时分桶和有界脱敏关联队列；Java Agent 提供 `telemetry.enabled` 开关。可选 telemetry 模块现提供 Prometheus 文本渲染和 OTLP/HTTP JSON 日志导出；已补逐节点终止原因、后台过期、有效委托数和深度以及 run 一致采样；完整 span 和性能验收仍待完成。详细接入和发展规划见 [可观测性](observability.md)。

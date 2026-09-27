@@ -68,4 +68,4 @@ Memory 新增 `MEMORY_READ_INPUT`、`MEMORY_READ_OUTPUT`、`MEMORY_WRITE`、`MEM
 
 ## 多 Agent 审计 schema 3
 
-当前 FileAuditSink 输出 schema 3，在 runId 之外增加 agentId、invocationId、parentInvocationId、delegationId；普通请求为 null。原 schema 1／2 日志仍需保留兼容处理。任务生命周期增加 AGENT_START、AGENT_DELEGATE、AGENT_FINISH、AGENT_REVOKE，runtime 生命周期与 Agent 决策日志应分别写入文件并关联查询。完整迁移及生命周期语义见 [多 Agent 安全](multi-agent-security.md)。
+当前 FileAuditSink 输出 schema 3，在 runId 之外增加 agentId、invocationId、parentInvocationId、delegationId；普通请求为 null。原 schema 1／2 日志仍需保留兼容处理。任务生命周期增加 AGENT_START、AGENT_DELEGATE、AGENT_FINISH、AGENT_REVOKE、AGENT_EXPIRE，runtime 生命周期与 Agent 决策日志应分别写入文件并关联查询。完整迁移及生命周期语义见 [多 Agent 安全](multi-agent-security.md)。

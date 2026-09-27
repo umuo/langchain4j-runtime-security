@@ -364,8 +364,10 @@ class AgentRuntimeTest {
                 var engine = engine()) {
             denied("agent-audit-error", () -> runtime.startRoot("reader", USER, READ, TTL));
             denied("agent-audit-error", () -> engine.check(event(root.context(), "lookup")));
-            // 移除登记会再次尝试审计，仍然拒绝；运行时最终关闭必须释放资源。
-            denied("agent-audit-error", root::close);
+            // 审计故障已使全部登记终止；重复关闭幂等，后续安全操作仍拒绝。
+            assertEquals(AgentEndReason.AUDIT_FAILED, root.endReason());
+            assertEquals(0, runtime.snapshot().activeInvocations());
+            root.close();
         }
     }
 

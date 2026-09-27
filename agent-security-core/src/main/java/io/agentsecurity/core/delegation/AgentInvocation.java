@@ -15,6 +15,9 @@ public final class AgentInvocation implements AutoCloseable {
     final AgentInvocation parent;
     final long deadline;
     final int depth;
+    final long createdNanos = System.nanoTime();
+    private volatile AgentEndReason endReason;
+    private volatile long lifetimeNanos;
     private final UUID invocationId = UUID.randomUUID();
     private final UUID delegationId = UUID.randomUUID();
     private final String agentId;
@@ -42,6 +45,25 @@ public final class AgentInvocation implements AutoCloseable {
                         identity.principalId(),
                         grant.permissions(),
                         this);
+    }
+
+    public int depth() {
+        return depth;
+    }
+
+    /** 未终止时返回 null；终止原因只写入一次。 */
+    public AgentEndReason endReason() {
+        return endReason;
+    }
+
+    /** 从登记创建至委托终止的时长，含排队时间；不是业务 CPU 时间。 */
+    public long lifetimeNanos() {
+        return lifetimeNanos;
+    }
+
+    void end(AgentEndReason reason, long now) {
+        lifetimeNanos = Math.max(0, now - createdNanos);
+        endReason = reason;
     }
 
     public UUID invocationId() {
@@ -88,7 +110,7 @@ public final class AgentInvocation implements AutoCloseable {
         result.whenComplete(
                 (value, error) -> {
                     if (result.isCancelled()) {
-                        revoke();
+                        runtime.finish(this, AgentEndReason.CANCELLED);
                     }
                 });
         try {
@@ -102,7 +124,7 @@ public final class AgentInvocation implements AutoCloseable {
                     });
         } catch (RuntimeException error) {
             try {
-                revoke();
+                runtime.finish(this, AgentEndReason.EXECUTOR_REJECTED);
             } catch (RuntimeException auditError) {
                 error.addSuppressed(auditError);
             }
@@ -119,24 +141,37 @@ public final class AgentInvocation implements AutoCloseable {
     }
 
     private <T> T execute(Callable<T> task) throws Exception {
+        Throwable failure = null;
         try {
             runtime.requireActive(context);
+            T value;
             try (var scope = SecurityContexts.open(context)) {
-                return task.call();
+                value = task.call();
             }
+            runtime.finish(this, AgentEndReason.COMPLETED);
+            return value;
+        } catch (Exception | Error error) {
+            failure = error;
+            throw error;
         } finally {
-            close();
+            if (failure != null) {
+                try {
+                    runtime.finish(this, AgentEndReason.FAILED);
+                } catch (RuntimeException cleanupError) {
+                    failure.addSuppressed(cleanupError);
+                }
+            }
         }
     }
 
     /** 使本次执行及所有后代的后续检查失败，不回滚已经发生的业务副作用。 */
     public void revoke() {
-        runtime.finish(this, true);
+        runtime.finish(this, AgentEndReason.REVOKED);
     }
 
     @Override
     public void close() {
-        runtime.finish(this, false);
+        runtime.finish(this, AgentEndReason.RELEASED);
     }
 
     @Override

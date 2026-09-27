@@ -310,7 +310,7 @@ try (var scope = SecurityContexts.open(context)) {
 
 检测器优先使用 `event.context()`，不要假设请求的 ThreadLocal、Spring Security 上下文或数据库事务会被带入检测线程。不要直接记录 `text`、`resource.id`、身份或工具参数。
 
-运行时另有 AGENT_START／AGENT_DELEGATE／AGENT_FINISH／AGENT_REVOKE 生命周期阶段，由 AgentRuntime 的审计消费者接收，不会自动送入应用 Detector 链。
+运行时另有 AGENT_START／AGENT_DELEGATE／AGENT_FINISH／AGENT_REVOKE／AGENT_EXPIRE 生命周期阶段，由 AgentRuntime 的审计消费者接收，不会自动送入应用 Detector 链。
 
 ### 5.2 各阶段可见内容
 

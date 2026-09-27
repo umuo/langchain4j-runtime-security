@@ -130,17 +130,17 @@ return a.get() + b.get();
 - `close()` 表示本次执行结束，并同样使未结束的后代失效。
 - 每次检查验证所有祖先，子任务有效期不超过父任务；使用单调时钟避免墙钟调整导致延长。
 - 默认最多登记 256 次执行，根深度为 0，允许深度最多为 8，最长有效期 5 分钟；可通过 AgentRuntimeLimits 收紧或在构造器允许范围内调整。
-- 已结束登记立即释放；过期登记在下次注册时惰性清理，过期后的操作检查仍立即拒绝。
+- 已结束登记立即释放；每个 runtime 有一个 daemon 清理线程，每 100ms 尝试清理到期登记。权限检查独立验证截止时间，不依赖清理线程及时运行。关闭应用时必须关闭 runtime 以释放线程。
 - 引擎在检测器执行前与全部通过后各检查一次委托状态，防止慢检测器期间已撤销仍直接放行。
 - 检查与业务副作用不是数据库原子事务；撤销不能回滚已完成操作，也不能消除检查通过后与真实 I/O 之间的竞态。实际业务服务仍须执行最终授权。
 
-生命周期审计使用内部 BoundedAuditSink，1 秒预算、128 个排队名额。审计异常使 runtime 进入持续拒绝状态；结束／撤销先使子树失效再写审计，不能因审计失败恢复授权。审计消费者不要重入 runtime，以免锁等待导致超时。runtime 关闭时负责关闭内部审计包装器；若消费者实现 AutoCloseable，也会由包装器在写线程结束后关闭，勿与其他组件混用生命周期不明确的 sink。
+生命周期审计使用内部 BoundedAuditSink，1 秒预算、128 个排队名额。审计异常使 runtime 进入持续拒绝状态并终止全部剩余登记；结束／撤销先使子树失效再写审计，不能因审计失败恢复授权。审计消费者不要重入 runtime，以免锁等待导致超时。runtime 关闭时负责关闭内部审计包装器；若消费者实现 AutoCloseable，也会由包装器在写线程结束后关闭，勿与其他组件混用生命周期不明确的 sink。
 
 ## 6. 审计与迁移
 
 FileAuditSink 的 JSONL **schemaVersion 升级为 3**，保留原 runId，并新增：`agentId`、`invocationId`、`parentInvocationId`、`delegationId`。普通上下文这些新字段为 null。关联 ID 由调度器随机产生；agentId 只使用可信注册标签，不填写客户信息或任务正文。
 
-任务登记与生命周期新增 `AGENT_START`、`AGENT_DELEGATE`、`AGENT_FINISH`、`AGENT_REVOKE` 阶段，由 runtime 的审计消费者接收。执行结束／撤销记录表示对应子树失效，不为每个后代重复生成终止事件。过期可从有效期策略与拒绝原因判断，没有后台到期事件流。注册前的参数／准入拒绝目前通过异常返回，不保证每一次失败申请都有生命周期审计记录。
+任务登记与生命周期新增 `AGENT_START`、`AGENT_DELEGATE`、`AGENT_FINISH`、`AGENT_REVOKE` 阶段，由 runtime 的审计消费者接收。每个已登记节点分别产生一次终止事件，包括尚未结束的后代。新增 AGENT_EXPIRE 阶段记录过期。审计故障可能造成持久化记录缺失，但全部登记已先失效。注册前的参数／准入拒绝目前通过异常返回，不保证每一次失败申请都有生命周期审计记录。
 
 Agent 原有决策审计与 runtime 生命周期审计是两条可关联的流。建议使用不同日志文件，按 runId、invocationId 关联；不要用两个 FileAuditSink 同时写同一路径。Agent stderr 日志也增加 invocation 和 parent；完整结构化字段使用 JSONL。
 
@@ -177,3 +177,36 @@ Agent 原有决策审计与 runtime 生命周期审计是两条可关联的流�
 - 完整回归：仓库根目录 `bash scripts/verify.sh`；发布重建：`bash scripts/release.sh`。
 
 跨服务工作负载认证、短期委托 Token、持久化委托注册表、自动父子框架入口适配、动态组织授权与跨进程撤销均未包含在本版本。
+
+## 8. 终止原因和运行状态
+
+`AgentInvocation.endReason()` 在未终止时为 null；终止后只赋值一次，重复关闭或撤销不会产生重复终止事件。`depth()` 从根的 0 开始，`lifetimeNanos()` 表示从创建登记至观察并处理终止的单调时长，包含排队与审计等待，不是业务 CPU 时间。
+
+| 原因 | 触发方式 |
+| --- | --- |
+| COMPLETED | Callable 成功返回且上下文恢复完成 |
+| FAILED | Callable 或执行过程抛错；保留原异常，清理失败作为 suppressed |
+| RELEASED | 手工关闭句柄，不能据此认定业务成功 |
+| CANCELLED / EXECUTOR_REJECTED | future 取消或执行器拒绝提交 |
+| REVOKED | 主动撤销本次执行 |
+| PARENT_FINISHED | 祖先成功返回或释放，本后代仍未结束 |
+| PARENT_REVOKED | 祖先撤销、异常或取消导致本后代失效 |
+| EXPIRED | 到达本次有效期或继承的父有效期 |
+| RUNTIME_CLOSED | 调度器关闭导致登记终止 |
+| AUDIT_FAILED | 生命周期审计故障导致其余登记整体失效 |
+
+审计仍使用 schema 3。终止事件的 rule 为固定 `agent-end-...`，例如 `agent-end-parent-finished`；decision=ALLOW 表示记录状态转换，不代表终止后仍允许调用。消费者应支持新阶段 AGENT_EXPIRE 及这些终止 rule。遥测增加类型化 endReason、depth、lifetimeNanos；OTLP 日志对应属性为 security.end.reason、security.delegation.depth、security.lifetime.nanos。
+
+`runtime.snapshot()` 返回有效委托数、最大活跃深度、按原因累计终止数。有效委托包括已登记但尚未开始执行的任务，不等于运行线程数。快照过滤已到期但尚未清理的登记，不依靠可能丢失的遥测做减法；终止计数在清理时才增加，可能晚于有效期到达。快照受 runtime 锁保护，慢审计可能延迟返回。
+
+`runtime.expireNow()` 可主动触发清理。后台每 100ms 是检查频率，不是硬实时保证；JVM 调度、锁竞争和逐节点审计可能延迟终止事件。整批授权在审计前失效，但大子树的逐节点审计总耗时会随节点数增长。后台审计失败后持续拒绝后续受保护操作，需运维处理并重建实例。
+
+完成、撤销和取消竞态中，第一个在 runtime 锁内完成的终止原因胜出。失效不保证业务线程或已发出的 I/O 立刻停止，也不回滚副作用；已经执行的 Callable 仍可能返回值。资源鉴权和事务仍由业务提供。
+
+Prometheus 可调用 `PrometheusMetrics.render(telemetry, exporter, runtime)`，增加：
+
+- `agent_security_invocations_active`：有效委托数。
+- `agent_security_delegation_depth_max`：最大活跃深度，无活跃委托时为 0。
+- `agent_security_invocations_ended_total{reason}`：按有限原因枚举分类的终止计数。
+
+该重载对应一个 runtime，多实例宿主应明确聚合，不能直接拼接多份同名指标。调度器和导出器分别关闭，避免调度器还在产生终止记录时提前停止导出。

@@ -83,6 +83,46 @@ class ExportTest {
     }
 
     @Test
+    void lifecycleReasonsDepthAndRuntimeGaugesAreExported() throws Exception {
+        var telemetry = new SecurityTelemetry(10, 1);
+        var grant =
+                io.agentsecurity.core.delegation.AgentGrant.tools(
+                        java.util.Set.of(), java.util.Set.of());
+        try (var runtime =
+                new io.agentsecurity.core.delegation.AgentRuntime(
+                        List.of(
+                                new io.agentsecurity.core.delegation.AgentDefinition(
+                                        "agent", grant, java.util.Set.of())),
+                        io.agentsecurity.core.delegation.AgentRuntimeLimits.defaults(),
+                        (e, d) -> {},
+                        telemetry)) {
+            var root =
+                    runtime.startRoot(
+                            "agent",
+                            SecurityContext.authenticated("tenant", "user", java.util.Set.of()),
+                            grant,
+                            Duration.ofSeconds(5));
+            assertTrue(
+                    PrometheusMetrics.render(telemetry, null, runtime)
+                            .contains("agent_security_invocations_active 1"));
+            root.call(() -> null);
+            String metrics = PrometheusMetrics.render(telemetry, null, runtime);
+            assertTrue(metrics.contains("agent_security_invocations_active 0"));
+            assertTrue(
+                    metrics.contains(
+                            "agent_security_invocations_ended_total{reason=\"COMPLETED\"} 1"));
+            String body =
+                    new String(
+                            OtlpJson.encode("service", telemetry.drain(10)),
+                            StandardCharsets.UTF_8);
+            assertTrue(body.contains("security.end.reason"));
+            assertTrue(body.contains("COMPLETED"));
+            assertTrue(body.contains("security.lifetime.nanos"));
+            assertTrue(body.contains("security.delegation.depth"));
+        }
+    }
+
+    @Test
     void responseParserRejectsMalformedOrImpossibleCounts() throws Exception {
         assertEquals(0, OtlpJson.rejected("{}".getBytes(StandardCharsets.UTF_8), 2));
         assertEquals(
