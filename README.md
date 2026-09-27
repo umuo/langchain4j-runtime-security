@@ -145,6 +145,8 @@ try (var scope = SecurityContexts.open(context)) {
 
 ## 扩展检测器 / 单独使用 SDK
 
+完整接入步骤见 [SDK 扩展指南](docs/sdk-extension.md)：扩展点对照、可复制的策略插件、SPI 注册与自检、普通 Java／Boot 部署、事件字段、自定义审计及排错。
+
 独立使用 `agent-security-core` 时可直接构造 `PolicyEngine`，在副作用发生前调用：
 
 ```java

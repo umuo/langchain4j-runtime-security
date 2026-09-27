@@ -49,6 +49,7 @@ nav:
   - 入门:
       - 项目概览与快速运行: overview.md
   - 安全接入:
+      - SDK 扩展与专属策略: sdk-extension.md
       - 工具权限与参数规则: tool-policy.md
       - 可信身份与异步传播: security-context.md
       - RAG 检索安全: rag-security.md

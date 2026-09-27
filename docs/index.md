@@ -18,6 +18,7 @@ Agent Security 将独立安全 SDK 与 Java Agent 自动插桩结合，在 LangC
 
 | 场景 | 文档 |
 | --- | --- |
+| 编写项目专属策略、插件注册、自定义审计 | [SDK 扩展指南](sdk-extension.md) |
 | 工具准入、参数校验、执行前拦截 | [工具权限与参数规则](tool-policy.md) |
 | 身份认证结果接入、租户绑定、异步上下文 | [可信身份与异步传播](security-context.md) |
 | 检索前授权、检索结果检查、数据源 ACL 边界 | [RAG 检索安全](rag-security.md) |
