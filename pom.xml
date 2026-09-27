@@ -79,6 +79,11 @@
         <version>2.43.0</version>
         <configuration>
           <java>
+            <includes>
+              <include>src/main/java/**/*.java</include>
+              <include>src/test/java/**/*.java</include>
+              <include>benchmarks/*.java</include>
+            </includes>
             <googleJavaFormat>
               <version>1.24.0</version>
               <style>AOSP</style>

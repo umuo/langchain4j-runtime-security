@@ -26,6 +26,8 @@ jobs:
           java-version: ${{ matrix.java }}
       - name: Build, test, generate SBOM, and verify reproducibility
         run: bash scripts/release.sh
+      - name: Smoke test telemetry benchmark accounting
+        run: python3 scripts/benchmark_telemetry.py --iterations 1000 --threads 1 --forks 1 --capacity 64
       - name: Preserve test and release evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -38,3 +40,4 @@ jobs:
             **/target/failsafe-reports/**
             target/release/**
             target/reproducibility.log
+            target/benchmarks/**

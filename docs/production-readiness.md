@@ -65,3 +65,7 @@ Memory 新增 9 项单元测试和 23 项 Boot 独立 JVM 场景，覆盖读写�
 ## 可观测性收集
 
 新增可选 `SecurityTelemetry`，提供固定 phase/outcome 计数、耗时分桶和有界脱敏关联队列；Java Agent 提供 `telemetry.enabled` 开关。可选 telemetry 模块现提供 Prometheus 文本渲染和 OTLP/HTTP JSON 日志导出；已补逐节点终止原因、后台过期、有效委托数和深度以及 run 一致采样；完整 span 和性能验收仍待完成。详细接入和发展规划见 [可观测性](observability.md)。
+
+## 性能诊断工具
+
+新增独立 JVM 遥测基线，已运行 18 个 fork，覆盖关闭收集、持续消费、消费者停滞；各轮计数守恒及队列上限通过。原始指标及测量范围见 [性能诊断基线](performance-baseline.md)。这不是长期压力、完整链路性能或生产 SLA 验收。CI 加入不设置性能阈值的三场景冒烟检查。
