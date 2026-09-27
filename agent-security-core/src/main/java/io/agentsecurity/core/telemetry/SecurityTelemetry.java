@@ -133,6 +133,11 @@ public final class SecurityTelemetry {
         return List.copyOf(result);
     }
 
+    /** 轻量队列长度查询，供关闭协调使用，避免构建完整指标快照。 */
+    public int queuedRecords() {
+        return queue == null ? 0 : queue.size();
+    }
+
     public Snapshot snapshot() {
         var metrics = new ArrayList<Metric>();
         if (counts != null) {

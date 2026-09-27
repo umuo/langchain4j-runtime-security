@@ -40,6 +40,7 @@ public final class OtlpLogExporter implements AutoCloseable {
     private final AtomicLong accepted = new AtomicLong();
     private final AtomicLong dropped = new AtomicLong();
     private final AtomicInteger pending = new AtomicInteger();
+    private final Object handoff = new Object();
 
     /** endpoint 是完整日志端点；HttpClient 由宿主管理，必须禁用重定向。构造后开始消费。 */
     public OtlpLogExporter(
@@ -114,9 +115,13 @@ public final class OtlpLogExporter implements AutoCloseable {
     private void run() {
         try {
             while (!closed.get()) {
-                var batch = telemetry.drain(batchSize);
-                if (!batch.isEmpty()) {
+                List<TelemetryRecord> batch;
+                // 与排空观察共享锁，不能暴露队列已取空、pending 尚未登记的中间状态。
+                synchronized (handoff) {
+                    batch = telemetry.drain(batchSize);
                     pending.set(batch.size());
+                }
+                if (!batch.isEmpty()) {
                     try {
                         export(batch);
                     } finally {
@@ -237,6 +242,37 @@ public final class OtlpLogExporter implements AutoCloseable {
                 return fallback;
             }
         }
+    }
+
+    /** 仅在生产者停止后用于关闭协调。等待有界，不关闭客户端，不承诺远端持久化或无丢弃。 */
+    public boolean awaitDrained(Duration limit) throws InterruptedException {
+        if (limit == null
+                || limit.isNegative()
+                || limit.isZero()
+                || limit.compareTo(Duration.ofSeconds(30)) > 0) {
+            throw new IllegalArgumentException("Invalid drain timeout");
+        }
+        long deadline = System.nanoTime() + limit.toNanos();
+        do {
+            synchronized (handoff) {
+                if (telemetry.queuedRecords() == 0 && pending.get() == 0) {
+                    return true;
+                }
+                if (closed.get() && pending.get() == 0) {
+                    return false;
+                }
+            }
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) {
+                return false;
+            }
+            TimeUnit.NANOSECONDS.sleep(Math.min(remaining, TimeUnit.MILLISECONDS.toNanos(10)));
+        } while (true);
+    }
+
+    /** 表示本实例仍接受导出工作，不代表网络或后端健康。 */
+    public boolean isRunning() {
+        return !closed.get() && worker.isAlive();
     }
 
     public Health health() {

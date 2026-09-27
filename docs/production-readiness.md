@@ -27,6 +27,8 @@
 
 ## 本地验证证据
 
+2026-09-28 06:01（Asia/Shanghai），恢复与排空迭代完整发布验证通过：core 61、policy 57、Agent 57、telemetry 15、普通 Java 41、Boot 84，共 **315 项，零失败、零错误、零跳过**。新增 1024 节点子树慢审计顺序验证，以及导出故障恢复、计数守恒、有界排空等待验证。四个运行时 JAR 隔离重建 SHA-256 一致，生成 SBOM。
+
 2026-09-28 05:41（Asia/Shanghai），生命周期迭代通过完整发布验证：core 60、policy 57、Agent 57、telemetry 13、普通 Java 41、Boot 84，共 **312 项，零失败、零错误、零跳过**。新增逐节点终止、并发终止互斥、取消／拒绝、后台过期、审计失败清空和 run 一致采样验证；Boot 委托场景新增每个节点唯一终止断言。四个运行时 JAR 隔离重建 SHA-256 一致，生成 SBOM。
 
 2026-09-28 05:24（Asia/Shanghai），导出适配器迭代完成 **303 项测试，零失败、零错误、零跳过**：core 52、policy 57、Agent 57、telemetry 12、普通 Java 41、Boot 84。完整 `release.sh` 回归通过后，修正 Prometheus 指标族连续输出，并对 core／telemetry 重新执行 release profile 验证。最终发布包重新执行四个运行时 JAR 的隔离重建和校验；本轮不宣称真实 Collector／Prometheus／TLS 或持续压力验收通过。

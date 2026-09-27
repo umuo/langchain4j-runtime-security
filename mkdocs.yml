@@ -63,6 +63,7 @@ nav:
   - 运维与交付:
       - 可观测性与发展规划: observability.md
       - 性能诊断基线: performance-baseline.md
+      - 恢复与子树验证: recovery-validation.md
       - 运行与故障恢复: operations.md
       - 构建与发布工程: release-engineering.md
       - 生产验收清单: production-readiness.md

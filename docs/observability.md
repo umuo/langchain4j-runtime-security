@@ -154,7 +154,7 @@ HTTP 429/502/503/504 与连接故障可有限重试；没有 `Retry-After` 时�
 
 导出器只接受禁用重定向的 HttpClient，避免跨目标转发认证头。endpoint 与 headers 必须来自可信宿主配置，不能由模型或用户请求直接控制。生产跨网络应使用 HTTPS；TLS、代理、HttpClient 执行器与连接资源由宿主管理。导出器不拥有或关闭传入的 HttpClient；创建应用级共享客户端，不要按请求创建导出器。自身线程数量有界不等于替宿主客户端提供线程池限制。
 
-`close()` 设置停止并中断在途等待，不等待远端，也不自动刷新。已取出的未确认批次会被计入 exporter dropped；核心队列中尚未取出的记录仍保留在收集器。生产关闭应停止新业务、等待业务结束，再等待 `queued=0` 和 `pending=0`（设置宿主总等待上限），最后关闭 exporter。进程崩溃和强制退出不保证统计与投递完整。
+`close()` 设置停止并中断在途等待，不等待远端，也不自动刷新。已取出的未确认批次会被计入 exporter dropped；核心队列中尚未取出的记录仍保留在收集器。生产关闭应停止新业务、等待业务结束，再调用 `exporter.awaitDrained(Duration.ofSeconds(5))` 等待排空，最后关闭 exporter。返回 true 只表示本收集器队列和本导出器在途批次均空，可能已经发生丢弃，仍需查看 accepted／dropped。返回 false 表示等待超时或已关闭但存在剩余队列。进程崩溃和强制退出不保证统计与投递完整。
 
 ### Prometheus 文本与健康指标
 
@@ -171,6 +171,7 @@ HTTP 429/502/503/504 与连接故障可有限重试；没有 `Retry-After` 时�
 | `agent_security_export_timeouts_total` | 请求或响应体等待超时次数 |
 | `agent_security_export_accepted_total` | 服务端响应确认接收的记录数 |
 | `agent_security_export_dropped_total` | 永久失败、耗尽重试、部分拒收及关闭取消的记录数 |
+| `agent_security_export_running` | 导出线程仍接受工作为 1，关闭或停止为 0；不是后端健康证明 |
 | `agent_security_export_pending` | 已拉取但尚未确认或丢弃的记录数 |
 
 阶段和结果是固定枚举；指标不携带用户、任意工具名或关联 UUID。直方图的 `+Inf` 与 count 从同一组桶生成；sum、事件计数及健康快照在并发期间仍非原子。生命周期对应的是审计耗时，不要把这条直方图当作 Agent 总运行时长。
@@ -186,3 +187,25 @@ HTTP 429/502/503/504 与连接故障可有限重试；没有 `Retry-After` 时�
 可使用 `PrometheusMetrics.render(telemetry, exporter, runtime)` 读取单个运行时的有效委托数、最大活跃深度及按原因累计的终止计数。这些值不受日志采样或队列丢弃影响。接入时先关闭 runtime，再等待遥测队列排空，最后关闭 exporter；详细语义见 [多 Agent 生命周期](multi-agent-security.md#8)。
 
 本轮 TelemetryRecord 增加 depth、endReason、lifetimeNanos，SecurityEvent.Phase 增加 AGENT_EXPIRE。升级时应重新编译 SDK、插件及导出适配器，更新严格枚举消费者。JSONL 审计 schema 3 不增加字段，终止原因使用 rule 表达。
+
+
+### 有界关闭协调
+
+`awaitDrained` 的预算必须大于 0 且不超过 30 秒，可被线程中断；调用方必须先停止所有生产者，并先关闭 runtime 以产生最后的终止记录。它观察当前收集器及本导出器，不保证其他消费者或远端持久化状态。该方法与导出器取批次共享短临界区，避免“队列已取空、pending 尚未设置”的假排空；不在锁内执行网络请求。
+
+```java
+try {
+    runtime.close();
+} finally {
+    try {
+        boolean empty = exporter.awaitDrained(Duration.ofSeconds(5));
+        // 将 empty 和 exporter.health() 写入业务运维日志，不能仅凭 empty 判断投递成功。
+    } finally {
+        exporter.close();
+    }
+}
+```
+
+等待包括导出轮询间隔、重试和在途请求；它不会强行唤醒工作线程。轮询间隔很长或大批积压时，短预算可能超时。即使返回 true，后续新生产者仍可再次入队，因此必须由宿主管理停止顺序。`isRunning()` 只用于识别实例是否停止，不替代导出故障指标。
+
+本轮增加本机 HTTP 503 到恢复的探针，及 1024 节点子树慢审计测试；范围和原始证据见 [恢复与子树验证](recovery-validation.md)。

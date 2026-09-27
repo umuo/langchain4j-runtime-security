@@ -58,6 +58,7 @@ public final class PrometheusMetrics {
         scalar(text, "agent_security_telemetry_queued", "gauge", snapshot.queued());
         if (exporter != null) {
             var health = exporter.health();
+            scalar(text, "agent_security_export_running", "gauge", exporter.isRunning() ? 1 : 0);
             scalar(text, "agent_security_export_attempts_total", "counter", health.attempts());
             scalar(text, "agent_security_export_failures_total", "counter", health.failures());
             scalar(text, "agent_security_export_timeouts_total", "counter", health.timeouts());
