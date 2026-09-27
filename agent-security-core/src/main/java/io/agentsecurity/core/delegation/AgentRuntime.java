@@ -6,6 +6,7 @@ import io.agentsecurity.core.SecurityBlockedException;
 import io.agentsecurity.core.SecurityContext;
 import io.agentsecurity.core.SecurityContexts;
 import io.agentsecurity.core.SecurityEvent;
+import io.agentsecurity.core.telemetry.SecurityTelemetry;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
@@ -20,6 +21,7 @@ public final class AgentRuntime implements AutoCloseable {
     private final Map<UUID, AgentInvocation> active = new HashMap<>();
     private final AgentRuntimeLimits limits;
     private final BoundedAuditSink audit;
+    private final SecurityTelemetry telemetry;
     private boolean closed;
     private boolean auditFailed;
 
@@ -27,6 +29,16 @@ public final class AgentRuntime implements AutoCloseable {
             List<AgentDefinition> definitions,
             AgentRuntimeLimits limits,
             BiConsumer<SecurityEvent, Decision> audit) {
+        this(definitions, limits, audit, SecurityTelemetry.disabled());
+    }
+
+    /** 可与 PolicyEngine 共享收集器，以执行 UUID 关联生命周期及安全决策。 */
+    public AgentRuntime(
+            List<AgentDefinition> definitions,
+            AgentRuntimeLimits limits,
+            BiConsumer<SecurityEvent, Decision> audit,
+            SecurityTelemetry telemetry) {
+        this.telemetry = Objects.requireNonNull(telemetry);
         this.limits = Objects.requireNonNull(limits);
         var registry = new HashMap<String, AgentDefinition>();
         if (definitions.isEmpty() || definitions.size() > 512) {
@@ -170,18 +182,19 @@ public final class AgentRuntime implements AutoCloseable {
     }
 
     private void emit(AgentInvocation invocation, SecurityEvent.Phase phase) {
+        var event =
+                new SecurityEvent(
+                        UUID.randomUUID(), phase, invocation.agentId(), "", invocation.context());
+        long started = System.nanoTime();
+        var outcome = SecurityTelemetry.Outcome.ALLOW;
         try {
-            audit.accept(
-                    new SecurityEvent(
-                            UUID.randomUUID(),
-                            phase,
-                            invocation.agentId(),
-                            "",
-                            invocation.context()),
-                    Decision.allow());
+            audit.accept(event, Decision.allow());
         } catch (RuntimeException error) {
+            outcome = SecurityTelemetry.Outcome.AUDIT_FAILURE;
             auditFailed = true;
             throw new SecurityBlockedException("agent-audit-error");
+        } finally {
+            telemetry.record(event, outcome, System.nanoTime() - started);
         }
     }
 

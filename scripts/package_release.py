@@ -15,8 +15,8 @@ from zipfile import ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 NS = {"m": "http://maven.apache.org/POM/4.0.0"}
 VERSION = ET.parse(ROOT / "pom.xml").getroot().findtext("m:version", namespaces=NS)
-MODULES = ["agent-security-core", "agent-security-policy", "agent-security-javaagent", "demo", "integration-spring-boot"]
-RUNTIME = MODULES[:3]
+MODULES = ["agent-security-core", "agent-security-policy", "agent-security-javaagent", "agent-security-telemetry", "demo", "integration-spring-boot"]
+RUNTIME = MODULES[:4]
 JARS = {module: ROOT / module / "target" / ("agent-security-javaagent.jar" if module.endswith("javaagent") else f"{module}-{VERSION}.jar") for module in RUNTIME}
 
 
@@ -65,7 +65,7 @@ def verify_reproducible():
         shutil.copytree(ROOT, checkout, ignore=shutil.ignore_patterns(".git", ".cache", "target", ".idea", "__pycache__", "var", "*.log", "*.jsonl*"))
         log = ROOT / "target" / "reproducibility.log"
         command = ["mvn", "-B", "-ntp", "-s", str(ROOT / ".mvn/settings.xml"),
-                   f"-Dmaven.repo.local={ROOT / '.cache/m2'}", "-pl", "agent-security-javaagent", "-am", "-DskipTests", "clean", "package"]
+                   f"-Dmaven.repo.local={ROOT / '.cache/m2'}", "-pl", "agent-security-javaagent,agent-security-telemetry", "-am", "-DskipTests", "clean", "package"]
         with log.open("w") as output:
             subprocess.run(command, cwd=checkout, stdout=output, stderr=subprocess.STDOUT, check=True)
         for module, original in JARS.items():
@@ -111,7 +111,7 @@ def main():
     (destination / "build-evidence.json").write_text(json.dumps(build, indent=2) + "\n")
     files = sorted(path for path in destination.rglob("*") if path.is_file())
     (destination / "SHA256SUMS").write_text("".join(f"{digest(path)}  {path.relative_to(destination).as_posix()}\n" for path in files))
-    print(f"Packaged {sum(counts.values())} passing tests; 3 runtime JARs reproduced: {destination}")
+    print(f"Packaged {sum(counts.values())} passing tests; {len(RUNTIME)} runtime JARs reproduced: {destination}")
 
 
 if __name__ == "__main__":

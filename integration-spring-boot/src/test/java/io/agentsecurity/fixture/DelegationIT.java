@@ -32,6 +32,7 @@ class DelegationIT {
         Path log = temporary.resolve("process.log");
         var properties = new Properties();
         properties.setProperty("agent.context.required", "true");
+        properties.setProperty("telemetry.enabled", "true");
         properties.setProperty("audit.path", decisions.toString());
         try (var writer = Files.newBufferedWriter(policy)) {
             properties.store(writer, "Delegation integration");
@@ -60,6 +61,7 @@ class DelegationIT {
         }
         String output = Files.readString(log);
         assertEquals(0, process.exitValue(), output);
+        assertTrue(output.contains("TELEMETRY_RESULT correlated=true"), output);
         assertTrue(
                 output.contains(
                         "DELEGATION_RESULT scenario="

@@ -427,3 +427,7 @@ Spring 应用可以用已注入业务服务的 Detector Bean 来构造这个手�
 | 某种框架调用没有事件 | 核对固定版本和适配范围；增加 Detector 不会自动创建新的插桩点 |
 
 现有仓库测试覆盖应用侧 SPI 的拒绝、超时和异常，以及普通 Java／Boot 的真实 JVM 拦截路径。你的专属策略仍应增加自己的单元测试和真实业务调用验证。完整支持与未验收项目见 [生产验收清单](production-readiness.md)。
+
+## 可观测性扩展
+
+安全指标与父子执行关联记录通过 `SecurityTelemetry.snapshot()` 和 `drain()` 提供，导出适配器在宿主独立线程中拉取，不参与安全决策链。无需 Spring，也无需替换检测器或安全审计。完整示例、Java Agent 开关、容量及采样限制见 [可观测性指南](observability.md)。

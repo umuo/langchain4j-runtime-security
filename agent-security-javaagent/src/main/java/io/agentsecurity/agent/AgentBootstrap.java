@@ -45,6 +45,7 @@ final class AgentBootstrap {
         Properties localProperties = new Properties();
         var streamKeys =
                 java.util.Set.of(
+                        "telemetry.enabled",
                         "stream.max.chars",
                         "stream.max.events",
                         "stream.max.active",
@@ -149,7 +150,15 @@ final class AgentBootstrap {
                                 Long.parseLong(
                                         properties.getProperty("audit.timeout.millis", "1000"))),
                         Integer.parseInt(properties.getProperty("audit.queue.capacity", "128")));
-        PolicyEngine policyEngine = new PolicyEngine(detectors, audit, limits);
+        String telemetryEnabled = properties.getProperty("telemetry.enabled", "false");
+        if (!telemetryEnabled.equals("true") && !telemetryEnabled.equals("false")) {
+            throw new IllegalArgumentException("Invalid telemetry.enabled");
+        }
+        var telemetry =
+                telemetryEnabled.equals("true")
+                        ? io.agentsecurity.core.telemetry.SecurityTelemetry.global()
+                        : io.agentsecurity.core.telemetry.SecurityTelemetry.disabled();
+        PolicyEngine policyEngine = new PolicyEngine(detectors, audit, limits, telemetry);
         Bridge.initialize(
                 policyEngine,
                 Integer.parseInt(localProperties.getProperty("max.text.chars", "100000")));

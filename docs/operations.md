@@ -41,7 +41,7 @@ SDK 抛出 `SecurityBlockedException`，`ruleId()` 是稳定原因标识。异�
 | `stream-timeout` | 生成、检查或消费等待超过流截止时间 | 检查模型延迟和订阅者 demand；丢弃尚未交付的缓冲内容，取消上游 |
 | `stream-event-order` / `missing-stream-response` / `stream-protocol-error` | reactive 上游违反已适配事件／订阅协议 | 检查 provider 与版本，不要忽略错误后释放缓存 |
 
-错误响应、计数、告警由业务接入；当前尚无内置 Prometheus、JMX 或 OpenTelemetry 导出。适配、类加载、插件构造等部分错误发生在决策引擎之外，未必存在相应 JSONL 决策记录。
+错误响应、告警由业务接入；已有可选进程内指标和有界关联记录收集，见 [可观测性](observability.md)。可选 telemetry 模块提供 Prometheus 文本渲染和 OTLP/HTTP JSON 日志导出；HTTP 指标端点由宿主提供，当前无 JMX 导出。适配、类加载、插件构造等部分错误发生在决策引擎之外，未必存在相应 JSONL 决策记录。
 
 ## 审计语义和故障恢复
 

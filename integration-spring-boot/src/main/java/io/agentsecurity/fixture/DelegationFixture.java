@@ -5,6 +5,7 @@ import dev.langchain4j.agent.tool.ToolExecutionRequest;
 import dev.langchain4j.service.tool.DefaultToolExecutor;
 import io.agentsecurity.core.*;
 import io.agentsecurity.core.delegation.*;
+import io.agentsecurity.core.telemetry.SecurityTelemetry;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -52,7 +53,8 @@ final class DelegationFixture {
                                         new AgentDefinition("planner", FULL, Set.of("reader")),
                                         new AgentDefinition("reader", READ, Set.of())),
                                 AgentRuntimeLimits.defaults(),
-                                journal)) {
+                                journal,
+                                SecurityTelemetry.global())) {
             if (scenario.equals("delegation-missing")) {
                 invoke("lookup");
             } else {
@@ -104,6 +106,29 @@ final class DelegationFixture {
             blocked = true;
             reason = failure.ruleId();
         }
+        var telemetryRecords = SecurityTelemetry.global().drain(256);
+        var toolRecord =
+                telemetryRecords.stream()
+                        .filter(record -> record.phase() == SecurityEvent.Phase.TOOL_INPUT)
+                        .findFirst()
+                        .orElseThrow();
+        boolean correlated =
+                scenario.equals("delegation-missing")
+                        ? toolRecord.invocationId() == null
+                        : telemetryRecords.stream()
+                                .anyMatch(
+                                        record ->
+                                                record.phase() == SecurityEvent.Phase.AGENT_DELEGATE
+                                                        && record.invocationId()
+                                                                .equals(toolRecord.invocationId())
+                                                        && record.parentInvocationId()
+                                                                .equals(
+                                                                        toolRecord
+                                                                                .parentInvocationId()));
+        if (!correlated || telemetryRecords.toString().contains("principal-delegation")) {
+            throw new IllegalStateException("Telemetry correlation or privacy failure");
+        }
+        System.out.println("TELEMETRY_RESULT correlated=" + correlated);
         System.out.printf(
                 "DELEGATION_RESULT scenario=%s blocked=%s toolCalls=%d restored=%s reason=%s%n",
                 scenario, blocked, calls.get(), SecurityContexts.current() == null, reason);

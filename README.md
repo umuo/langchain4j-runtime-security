@@ -212,7 +212,7 @@ audit.queue.capacity=128
 
 带 SBOM、隔离重建比对和 SHA-256 交付清单的流程：`bash scripts/release.sh`，详见 [发布工程](docs/release-engineering.md)。CI 已配置 JDK 17／21，但远端尚未执行；配置不代表支持矩阵已经验收。
 
-本轮选择性验证运行环境：JDK 21.0.4、LangChain4j 1.20.0、Spring Boot 4.1.1。最新通过数量、未执行范围与验收缺口见 [生产验收清单](docs/production-readiness.md)，原始结果保存在各模块 `target/surefire-reports` 和 `target/failsafe-reports`。
+本轮完整发布验证运行环境：JDK 21.0.4、LangChain4j 1.20.0、Spring Boot 4.1.1。最新通过数量与验收缺口见 [生产验收清单](docs/production-readiness.md)，原始结果保存在各模块 `target/surefire-reports` 和 `target/failsafe-reports`。
 
 `bash scripts/verify.sh` 执行 `clean verify`：清除旧构建输出，运行 core／Agent 单元测试、打包 Agent 和 demo，再由 Failsafe 为每个集成场景启动新的 JVM。覆盖无 Agent 对照、合法放行、输入／输出拒绝、工具副作用计数、吞异常的业务 handler、工具返回检测、异步路径、并发调度、回调／reactive 流、外部配置和日志不含测试敏感标记。
 
@@ -259,3 +259,7 @@ mkdocs serve
 ```
 
 打开 `http://127.0.0.1:8000/`。严格构建使用 `mkdocs build --strict`，输出位于 `site/`。
+
+## 可观测性
+
+提供不依赖 Spring 的固定维度指标、耗时分桶和有界父子执行关联队列。Java Agent 可设置 `telemetry.enabled=true`，业务通过 `SecurityTelemetry.global()` 拉取；独立 SDK 可显式传入收集器。默认关闭，队列满不影响安全决策。可选 `agent-security-telemetry` 模块提供 Prometheus 文本及 OTLP/HTTP 日志导出，不要求 Spring。接入、限制和后续路线见 [可观测性指南](docs/observability.md)。

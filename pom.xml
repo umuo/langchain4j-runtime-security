@@ -7,6 +7,7 @@
   <modules>
     <module>agent-security-core</module>
     <module>agent-security-policy</module>
+    <module>agent-security-telemetry</module>
     <module>agent-security-javaagent</module>
     <module>demo</module>
     <module>integration-spring-boot</module>

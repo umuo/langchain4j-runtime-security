@@ -1,6 +1,7 @@
 package io.agentsecurity.core;
 
 import io.agentsecurity.core.delegation.DelegationGuard;
+import io.agentsecurity.core.telemetry.SecurityTelemetry;
 import java.util.List;
 import java.util.function.BiConsumer;
 
@@ -17,6 +18,8 @@ public final class PolicyEngine implements AutoCloseable {
 
     private final boolean owner;
 
+    private final SecurityTelemetry telemetry;
+
     public PolicyEngine(List<Detector> detectors, BiConsumer<SecurityEvent, Decision> audit) {
         this(detectors, audit, DetectionLimits.defaults());
     }
@@ -25,7 +28,16 @@ public final class PolicyEngine implements AutoCloseable {
             List<Detector> detectors,
             BiConsumer<SecurityEvent, Decision> audit,
             DetectionLimits limits) {
-        this(detectors, audit, limits, new DetectionExecutor(limits), true);
+        this(detectors, audit, limits, SecurityTelemetry.disabled());
+    }
+
+    /** 收集器由宿主管理，可与 AgentRuntime 共享，不执行导出网络请求。 */
+    public PolicyEngine(
+            List<Detector> detectors,
+            BiConsumer<SecurityEvent, Decision> audit,
+            DetectionLimits limits,
+            SecurityTelemetry telemetry) {
+        this(detectors, audit, limits, new DetectionExecutor(limits), true, telemetry);
     }
 
     private PolicyEngine(
@@ -33,18 +45,20 @@ public final class PolicyEngine implements AutoCloseable {
             BiConsumer<SecurityEvent, Decision> audit,
             DetectionLimits limits,
             DetectionExecutor executor,
-            boolean owner) {
+            boolean owner,
+            SecurityTelemetry telemetry) {
         this.detectors = List.copyOf(detectors);
         this.audit = java.util.Objects.requireNonNull(audit);
         this.limits = limits;
         this.executor = executor;
         this.owner = owner;
+        this.telemetry = java.util.Objects.requireNonNull(telemetry);
     }
 
     public PolicyEngine withAdditionalDetectors(List<Detector> additional) {
         var combined = new java.util.ArrayList<>(detectors);
         combined.addAll(additional);
-        return new PolicyEngine(combined, audit, limits, executor, false);
+        return new PolicyEngine(combined, audit, limits, executor, false, telemetry);
     }
 
     /** SPI 的延迟加载也受执行时限约束，避免扩展初始化阻塞受保护调用。 */
@@ -54,6 +68,25 @@ public final class PolicyEngine implements AutoCloseable {
 
     /** 所有检测器共享同一个截止时间；检测或审计失败均抛出可识别的阻断异常。 */
     public void check(SecurityEvent event) {
+        long started = System.nanoTime();
+        var outcome = SecurityTelemetry.Outcome.INTERNAL_ERROR;
+        try {
+            checkInternal(event);
+            outcome = SecurityTelemetry.Outcome.ALLOW;
+        } catch (SecurityBlockedException error) {
+            outcome =
+                    error.ruleId().equals("audit-error")
+                            ? SecurityTelemetry.Outcome.AUDIT_FAILURE
+                            : error.ruleId().startsWith("detector-")
+                                    ? SecurityTelemetry.Outcome.DETECTOR_FAILURE
+                                    : SecurityTelemetry.Outcome.DENY;
+            throw error;
+        } finally {
+            telemetry.record(event, outcome, System.nanoTime() - started);
+        }
+    }
+
+    private void checkInternal(SecurityEvent event) {
         Decision decision = DelegationGuard.evaluate(event);
         long deadline = System.nanoTime() + limits.timeout().toNanos();
         if (executor.isClosed()) {

@@ -11,10 +11,10 @@ bash scripts/release.sh
 ## 交付步骤
 
 1. 执行 `-Prelease clean verify`，重新编译并运行单元及独立 JVM 集成测试。
-2. 固定 CycloneDX Maven 插件 2.9.3 生成 schema 1.6 的 JSON SBOM。三个交付模块分别提供自己的运行时依赖清单，排除 test scope；聚合清单还包含演示及 Boot 测试应用，不能误当作 Agent 的运行时依赖集合。插件说明见 [官方文档](https://cyclonedx.github.io/cyclonedx-maven-plugin/)；SBOM 本身不是漏洞扫描结果。
+2. 固定 CycloneDX Maven 插件 2.9.3 生成 schema 1.6 的 JSON SBOM。四个交付模块分别提供自己的运行时依赖清单，排除 test scope；聚合清单还包含演示及 Boot 测试应用，不能误当作 Agent 的运行时依赖集合。插件说明见 [官方文档](https://cyclonedx.github.io/cyclonedx-maven-plugin/)；SBOM 本身不是漏洞扫描结果。
 3. 包装脚本检查每个模块都有执行过的测试报告，失败、错误、跳过均导致拒绝打包；检查 JAR 可读、Agent manifest 正确、没有打包 LangChain4j 应用类。
-4. 在临时隔离源码目录重建 core、policy、Agent，比较三个 JAR 的 SHA-256。第二遍仅重建运行时产物，不重复执行测试；第一遍报告和 SBOM 保留。不同则拒绝交付。
-5. 输出到 `target/release/agent-security-0.1.0-SNAPSHOT/`：三个 JAR、模块 SBOM／POM、配置示例、文档、原始测试报告、build-evidence.json、SHA256SUMS。
+4. 在临时隔离源码目录重建 core、policy、Agent、telemetry，比较四个 JAR 的 SHA-256。第二遍仅重建运行时产物，不重复执行测试；第一遍报告和 SBOM 保留。不同则拒绝交付。
+5. 输出到 `target/release/agent-security-0.1.0-SNAPSHOT/`：四个 JAR、模块 SBOM／POM、配置示例、文档、原始测试报告、build-evidence.json、SHA256SUMS。
 
 源码通过 `project.build.outputTimestamp` 固定归档时间。同一 JDK／Maven 下不同源码目录的 JAR 一致性检查不代表跨 JDK、跨平台、跨 Maven 的全环境可重复构建。文档、SBOM、测试报告和构建环境记录作为证据保存；整个交付目录没有宣称逐字节可重复。
 

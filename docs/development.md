@@ -7,6 +7,8 @@ Java 主代码和测试代码统一使用四空格缩进、UTF-8 和 LF 换行�
 | 目录或包 | 职责 |
 | --- | --- |
 | `agent-security-core / io.agentsecurity.core` | 对外 SDK、检测器 SPI、策略执行、身份上下文和审计 |
+| `core.telemetry` | 固定维度指标与有界脱敏关联队列，不依赖导出协议 |
+| `agent-security-telemetry / io.agentsecurity.telemetry` | 可选 Prometheus 文本与 OTLP/HTTP 日志导出、协议和健康指标 |
 | `core.delegation` | 同 JVM 的父子执行登记、权限收窄、有效性检查与生命周期 |
 | `agent-security-policy / io.agentsecurity.policy` | 工具参数策略和严格 JSON 解析 |
 | `agent-security-javaagent / io.agentsecurity.agent` | `premain` 入口与启动配置 |
