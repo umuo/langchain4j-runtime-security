@@ -46,7 +46,7 @@ jobs:
       - name: Read Pages configuration
         id: pages
         if: github.event_name != 'pull_request' && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+        uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - name: Build with strict link validation
         env:
           DOCS_SITE_URL: ${{ steps.pages.outputs.base_url || 'http://127.0.0.1:8000' }}/
