@@ -10,11 +10,12 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-/** 本机 503 到恢复的持续探针；只发送合成事件，不访问外部服务。 */
+/** 本机协议故障到恢复的持续探针；只发送合成事件，不访问外部服务。 */
 public final class ExporterRecoveryProbe {
     public static void main(String[] args) throws Exception {
-        if (args.length != 2) {
-            throw new IllegalArgumentException("outageSeconds recoverySeconds required");
+        if (args.length != 3) {
+            throw new IllegalArgumentException(
+                    "outageSeconds recoverySeconds failureMode required");
         }
         int outage = Integer.parseInt(args[0]);
         int recovery = Integer.parseInt(args[1]);
@@ -25,16 +26,51 @@ public final class ExporterRecoveryProbe {
                 || outage + recovery > 3600) {
             throw new IllegalArgumentException("Invalid probe duration");
         }
+        String mode = args[2];
+        if (!java.util.Set.of("unavailable", "disconnect", "stall").contains(mode)) {
+            throw new IllegalArgumentException("Invalid failure mode");
+        }
         var healthy = new AtomicBoolean();
         var server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        var handlers =
+                new java.util.concurrent.ThreadPoolExecutor(
+                        2,
+                        2,
+                        0,
+                        java.util.concurrent.TimeUnit.SECONDS,
+                        new java.util.concurrent.ArrayBlockingQueue<>(16),
+                        task -> {
+                            var thread = new Thread(task, "recovery-probe-http");
+                            thread.setDaemon(true);
+                            return thread;
+                        });
+        server.setExecutor(handlers);
         server.createContext(
                 "/v1/logs",
                 exchange -> {
-                    exchange.getRequestBody().readAllBytes();
-                    exchange.getResponseHeaders().set("Content-Type", "application/json");
-                    exchange.sendResponseHeaders(healthy.get() ? 200 : 503, 2);
-                    exchange.getResponseBody().write(new byte[] {'{', '}'});
-                    exchange.close();
+                    try {
+                        exchange.getRequestBody().readAllBytes();
+                        boolean failed = !healthy.get();
+                        if (failed && mode.equals("disconnect")) {
+                            return;
+                        }
+                        exchange.getResponseHeaders().set("Content-Type", "application/json");
+                        if (failed && mode.equals("stall")) {
+                            exchange.sendResponseHeaders(200, 64);
+                            exchange.getResponseBody().write('{');
+                            exchange.getResponseBody().flush();
+                            try {
+                                Thread.sleep(2000);
+                            } catch (InterruptedException stopped) {
+                                Thread.currentThread().interrupt();
+                            }
+                            return;
+                        }
+                        exchange.sendResponseHeaders(failed ? 503 : 200, 2);
+                        exchange.getResponseBody().write(new byte[] {'{', '}'});
+                    } finally {
+                        exchange.close();
+                    }
                 });
         server.start();
         var telemetry = new SecurityTelemetry(128, 1);
@@ -104,13 +140,18 @@ public final class ExporterRecoveryProbe {
                     || generated != health.accepted() + health.dropped() + queueDropped) {
                 throw new IllegalStateException("Recovery or accounting failed");
             }
+            if (mode.equals("stall") && health.timeouts() == 0) {
+                throw new IllegalStateException("Stall did not exercise a timeout");
+            }
             System.out.printf(
                     java.util.Locale.ROOT,
-                    "{\"outageSeconds\":%d,\"recoverySeconds\":%d,\"generated\":%d,"
+                    "{\"failureMode\":\"%s\",\"timeouts\":%d,\"outageSeconds\":%d,\"recoverySeconds\":%d,\"generated\":%d,"
                             + "\"accepted\":%d,\"exportDropped\":%d,\"queueDropped\":%d,"
                             + "\"attempts\":%d,\"failures\":%d,\"maxQueued\":%d,\"maxPending\":%d,"
                             + "\"sampledMaxHeapBytes\":%d,\"sampledMaxJvmThreads\":%d,"
                             + "\"firstAcceptedAfterRecoveryNanos\":%d,\"drained\":true}%n",
+                    mode,
+                    health.timeouts(),
                     outage,
                     recovery,
                     generated,
@@ -126,6 +167,7 @@ public final class ExporterRecoveryProbe {
                     firstAcceptedAfterRecovery);
         } finally {
             server.stop(0);
+            handlers.shutdownNow();
         }
     }
 }

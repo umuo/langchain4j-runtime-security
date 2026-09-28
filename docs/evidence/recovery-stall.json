@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "kind": "local-synthetic-http-recovery",
+  "createdAt": "2026-09-28T04:37:47.337006+00:00",
+  "platform": "macOS-15.3.2-arm64-arm-64bit",
+  "java": "openjdk version \"21.0.4\" 2024-07-16 LTS\nOpenJDK Runtime Environment Zulu21.36+17-CA (build 21.0.4+7-LTS)\nOpenJDK 64-Bit Server VM Zulu21.36+17-CA (build 21.0.4+7-LTS, mixed mode, sharing)\n",
+  "artifactSha256": {
+    "agent-security-core-0.1.0-SNAPSHOT.jar": "35acfd7905508f2708f8ffebaa5febbfcb12d5477a4ebb5fb46149bfee616403",
+    "agent-security-telemetry-0.1.0-SNAPSHOT.jar": "421d506ade37486c7605bc0d69daa0c857c6eb0a850dee17b4883f13207f083a",
+    "jackson-core-2.22.1.jar": "941ff029bcdb93e83d209ce516c1a7fb8bbac07d0a2fa122f5bf194b2cd7b4f4"
+  },
+  "sourceSha256": "69356327c4a0b07f341e94784d36c0f76f3310f116c11e9799a0a1a7f447ff3d",
+  "jvmArgs": [
+    "-Xms128m",
+    "-Xmx128m"
+  ],
+  "result": {
+    "failureMode": "stall",
+    "timeouts": 5,
+    "outageSeconds": 5,
+    "recoverySeconds": 5,
+    "generated": 1589,
+    "accepted": 821,
+    "exportDropped": 2,
+    "queueDropped": 766,
+    "attempts": 294,
+    "failures": 5,
+    "maxQueued": 128,
+    "maxPending": 32,
+    "sampledMaxHeapBytes": 28530144,
+    "sampledMaxJvmThreads": 16,
+    "firstAcceptedAfterRecoveryNanos": 893236458,
+    "drained": true
+  }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local synthetic HTTP 503/recovery probe; not a real Collector acceptance test."""
+"""Local synthetic HTTP failure/recovery probe; not a real Collector acceptance test."""
 import argparse
 import hashlib
 import json
@@ -18,6 +18,7 @@ NS = {"m": "http://maven.apache.org/POM/4.0.0"}
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--failure-mode", choices=["unavailable", "disconnect", "stall"], default="unavailable")
     parser.add_argument("--outage-seconds", type=int, default=10)
     parser.add_argument("--recovery-seconds", type=int, default=10)
     parser.add_argument("--output", type=Path, default=ROOT / "target/benchmarks/exporter-recovery.json")
@@ -43,7 +44,7 @@ def main():
         classpath = os.pathsep.join([classes, *(str(path) for path in artifacts)])
         subprocess.run([javac, "--release", "17", "-cp", classpath, "-d", classes, str(source)], check=True, timeout=60)
         result = subprocess.run([java, "-Xms128m", "-Xmx128m", "-cp", classpath, "ExporterRecoveryProbe",
-                                 str(args.outage_seconds), str(args.recovery_seconds)],
+                                 str(args.outage_seconds), str(args.recovery_seconds), args.failure_mode],
                                 check=True, capture_output=True, text=True,
                                 timeout=args.outage_seconds + args.recovery_seconds + 30)
     report = {"schemaVersion": 1, "kind": "local-synthetic-http-recovery",
