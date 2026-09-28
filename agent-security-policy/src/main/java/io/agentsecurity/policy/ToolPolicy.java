@@ -64,7 +64,8 @@ public final class ToolPolicy implements Detector {
             throw StrictJson.invalid();
         }
         for (var entry : definitions.entrySet()) {
-            if (!entry.getKey().matches("[\\p{L}\\p{N}_.-]{1,128}")) {
+            if (!entry.getKey().matches("[\\p{L}\\p{N}_.-]{1,128}")
+                    && !entry.getKey().matches("mcp:[a-zA-Z0-9_.-]{1,100}/[a-zA-Z0-9_.-]{1,100}")) {
                 throw StrictJson.invalid();
             }
             Rule rule = compile(object(entry.getValue()), 0);
@@ -128,7 +129,8 @@ public final class ToolPolicy implements Detector {
 
     @Override
     public Decision evaluate(SecurityEvent event) {
-        if (event.phase() != SecurityEvent.Phase.TOOL_INPUT) {
+        if (event.phase() != SecurityEvent.Phase.TOOL_INPUT
+                && event.phase() != SecurityEvent.Phase.MCP_TOOL_INPUT) {
             return Decision.allow();
         }
         Rule rule = tools.get(event.operation());

@@ -47,6 +47,8 @@ public record SecurityEvent(
         MODEL_OUTPUT,
         TOOL_INPUT,
         TOOL_OUTPUT,
+        MCP_TOOL_INPUT,
+        MCP_TOOL_OUTPUT,
         RETRIEVAL_INPUT,
         RETRIEVAL_OUTPUT,
         AUGMENTATION_INPUT,

@@ -21,7 +21,7 @@ public final class DelegationGuard {
         }
         var grant = invocation.grant();
         return switch (event.phase()) {
-            case TOOL_INPUT, TOOL_OUTPUT ->
+            case TOOL_INPUT, TOOL_OUTPUT, MCP_TOOL_INPUT, MCP_TOOL_OUTPUT ->
                     grant.tools().contains(event.operation())
                             ? Decision.allow()
                             : Decision.deny("agent-tool-denied");

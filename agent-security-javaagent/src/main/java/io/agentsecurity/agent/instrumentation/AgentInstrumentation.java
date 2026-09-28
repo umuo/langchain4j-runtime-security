@@ -3,6 +3,7 @@ package io.agentsecurity.agent.instrumentation;
 import static net.bytebuddy.matcher.ElementMatchers.*;
 
 import io.agentsecurity.agent.bridge.Bridge;
+import io.agentsecurity.agent.bridge.McpBridge;
 import io.agentsecurity.agent.bridge.MemoryBridge;
 import io.agentsecurity.agent.bridge.RagBridge;
 import io.agentsecurity.agent.instrumentation.advice.ErrorHandlerAdvice;
@@ -10,6 +11,8 @@ import io.agentsecurity.agent.instrumentation.advice.ExecutorArgumentAdvice;
 import io.agentsecurity.agent.instrumentation.advice.ExecutorReturnAdvice;
 import io.agentsecurity.agent.instrumentation.advice.ExecutorServiceReturnAdvice;
 import io.agentsecurity.agent.instrumentation.advice.FutureAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpFutureAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpSyncAdvice;
 import io.agentsecurity.agent.instrumentation.advice.MemoryDispatchAdvice;
 import io.agentsecurity.agent.instrumentation.advice.MemoryFutureAdvice;
 import io.agentsecurity.agent.instrumentation.advice.MemoryReadAdvice;
@@ -99,6 +102,17 @@ public final class AgentInstrumentation {
                         .and(not(isAbstract()))
                         .and(not(isNative()))
                         .and(not(isStatic()));
+        var mcpType = named(McpBridge.CLIENT);
+        var mcpMethods =
+                namedOneOf("executeTool", "executeToolAsync")
+                        .and(
+                                takesArgument(
+                                        0,
+                                        named("dev.langchain4j.agent.tool.ToolExecutionRequest")))
+                        .and(isPublic())
+                        .and(not(isAbstract()))
+                        .and(not(isStatic()))
+                        .and(not(isNative()));
         ThreadLocal<Boolean> failedTransform = new ThreadLocal<>();
         var transformer =
                 new AgentBuilder.Default()
@@ -323,6 +337,24 @@ public final class AgentInstrumentation {
                                                         .on(
                                                                 named("chatMemoryStore")
                                                                         .and(takesArguments(1)))))
+                        .type(mcpType.or(hasSuperType(mcpType)))
+                        .transform(
+                                (builder, type, loader, module, domain) ->
+                                        builder.visit(
+                                                        Advice.to(McpSyncAdvice.class)
+                                                                .on(
+                                                                        mcpMethods.and(
+                                                                                not(
+                                                                                        returns(
+                                                                                                CompletableFuture
+                                                                                                        .class)))))
+                                                .visit(
+                                                        Advice.to(McpFutureAdvice.class)
+                                                                .on(
+                                                                        mcpMethods.and(
+                                                                                returns(
+                                                                                        CompletableFuture
+                                                                                                .class)))))
                         .makeRaw();
         instrumentation.addTransformer(
                 new FailClosedTransformer(transformer, failedTransform), false);

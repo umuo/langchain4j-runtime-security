@@ -8,6 +8,11 @@
   <artifactId>agent-security-demo</artifactId>
   <dependencies>
     <dependency>
+      <groupId>dev.langchain4j</groupId>
+      <artifactId>langchain4j-mcp</artifactId>
+      <version>1.20.0-beta30</version>
+    </dependency>
+    <dependency>
       <groupId>io.agentsecurity</groupId>
       <artifactId>agent-security-policy</artifactId>
       <version>${project.version}</version>

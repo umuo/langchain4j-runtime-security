@@ -58,6 +58,7 @@ nav:
       - SDK 扩展与专属策略: sdk-extension.md
       - 远程安全检测客户端: remote-detector.md
       - 策略版本与回滚: policy-versioning.md
+      - MCP 工具边界: mcp-security.md
       - 工具权限与参数规则: tool-policy.md
       - 可信身份与异步传播: security-context.md
       - RAG 检索安全: rag-security.md

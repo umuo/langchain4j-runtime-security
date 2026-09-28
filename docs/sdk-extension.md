@@ -441,3 +441,7 @@ Spring 应用可以用已注入业务服务的 Detector Bean 来构造这个手�
 ## 策略发布与回滚
 
 需要不停机更新规则时，可使用 PolicyCompiler + AtomicPolicy，并通过 VersionedDetector SPI 接入。单次检查固定快照，可靠审计记录所选版本；普通 SDK 可用 pinPolicy() 显式固定任务视图。管理鉴权、持久化与跨节点发布仍由宿主负责。完整示例与限制见 [策略版本与回滚](policy-versioning.md)。
+
+## MCP 专属策略扩展
+
+新增 `MCP_TOOL_INPUT`、`MCP_TOOL_OUTPUT` 阶段，operation 使用 `mcp:客户端key/物理工具名`。Detector SPI、ToolPolicy 参数规则与委托 AgentGrant 可以使用此名称；必须同步配置 `allow.mcp.tools`。完整示例、调用顺序与未覆盖范围见 [MCP 工具边界](mcp-security.md)。

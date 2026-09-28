@@ -16,6 +16,8 @@ public final class LocalPolicy implements Detector {
 
     private final Set<String> allowedRetrievers;
 
+    private final Set<String> allowedMcpTools;
+
     private final java.util.Map<SecurityEvent.Phase, String> memoryPermissions;
 
     private final List<String> deniedText;
@@ -30,6 +32,7 @@ public final class LocalPolicy implements Detector {
                         "agent.context.required",
                         "deny.tools",
                         "allow.tools",
+                        "allow.mcp.tools",
                         "allow.retrievers",
                         "deny.text",
                         "max.text.chars",
@@ -55,6 +58,12 @@ public final class LocalPolicy implements Detector {
                 properties.containsKey("allow.retrievers")
                         ? Set.copyOf(split(properties.getProperty("allow.retrievers")))
                         : null;
+        allowedMcpTools = Set.copyOf(split(properties.getProperty("allow.mcp.tools", "")));
+        if (allowedMcpTools.stream()
+                .anyMatch(
+                        name -> !name.matches("mcp:[a-zA-Z0-9_.-]{1,100}/[a-zA-Z0-9_.-]{1,100}"))) {
+            throw new IllegalArgumentException("Invalid allow.mcp.tools");
+        }
         var permissions =
                 new java.util.EnumMap<SecurityEvent.Phase, String>(SecurityEvent.Phase.class);
         for (var entry :
@@ -96,6 +105,12 @@ public final class LocalPolicy implements Detector {
     public Decision evaluate(SecurityEvent event) {
         if (requireAgent && (event.context() == null || event.context().invocation() == null)) {
             return Decision.deny("missing-agent-context");
+        }
+        // MCP 必须显式授权服务与工具组合，普通工具允许列表不能隐式开放远程工具。
+        if ((event.phase() == SecurityEvent.Phase.MCP_TOOL_INPUT
+                        || event.phase() == SecurityEvent.Phase.MCP_TOOL_OUTPUT)
+                && !allowedMcpTools.contains(event.operation())) {
+            return Decision.deny("mcp-tool-not-allowed");
         }
         String permission = memoryPermissions.get(event.phase());
         if (permission != null) {
