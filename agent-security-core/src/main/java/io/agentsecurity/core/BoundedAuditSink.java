@@ -16,6 +16,15 @@ public final class BoundedAuditSink implements BiConsumer<SecurityEvent, Decisio
     private final long timeoutNanos;
 
     private final AtomicBoolean failed = new AtomicBoolean();
+    private final java.util.concurrent.atomic.LongAdder timeouts =
+            new java.util.concurrent.atomic.LongAdder();
+    private final java.util.concurrent.atomic.LongAdder errors =
+            new java.util.concurrent.atomic.LongAdder();
+    private final java.util.concurrent.atomic.LongAdder rejected =
+            new java.util.concurrent.atomic.LongAdder();
+    private final java.util.concurrent.atomic.LongAdder interrupted =
+            new java.util.concurrent.atomic.LongAdder();
+    private final int capacity;
 
     public BoundedAuditSink(
             BiConsumer<SecurityEvent, Decision> delegate, Duration timeout, int capacity) {
@@ -28,6 +37,7 @@ public final class BoundedAuditSink implements BiConsumer<SecurityEvent, Decisio
         if (capacity < 1 || capacity > 4096) {
             throw new IllegalArgumentException("Invalid audit capacity");
         }
+        this.capacity = capacity;
         timeoutNanos = timeout.toNanos();
         writer =
                 new ThreadPoolExecutor(
@@ -50,6 +60,7 @@ public final class BoundedAuditSink implements BiConsumer<SecurityEvent, Decisio
                             try {
                                 closeable.close();
                             } catch (Exception ignored) {
+                                errors.increment();
                                 failed.set(true);
                             }
                         }
@@ -60,6 +71,7 @@ public final class BoundedAuditSink implements BiConsumer<SecurityEvent, Decisio
     @Override
     public void accept(SecurityEvent event, Decision decision) {
         if (failed.get() || writer.isShutdown()) {
+            rejected.increment();
             throw new IllegalStateException("Audit unavailable");
         }
         Future<?> pending = null;
@@ -83,6 +95,7 @@ public final class BoundedAuditSink implements BiConsumer<SecurityEvent, Decisio
                 throw new IllegalStateException("Audit unavailable");
             }
         } catch (InterruptedException error) {
+            interrupted.increment();
             failed.set(true);
             cancel(pending);
             Thread.currentThread().interrupt();
@@ -91,10 +104,33 @@ public final class BoundedAuditSink implements BiConsumer<SecurityEvent, Decisio
                 | TimeoutException
                 | CancellationException
                 | RejectedExecutionException error) {
+            if (error instanceof TimeoutException) {
+                timeouts.increment();
+            } else if (error instanceof RejectedExecutionException
+                    || error instanceof CancellationException) {
+                rejected.increment();
+            } else {
+                errors.increment();
+            }
             failed.set(true);
             cancel(pending);
             throw new IllegalStateException("Audit unavailable");
         }
+    }
+
+    /** 失败状态包含正常关闭后的不可用状态；closed 用于区分关闭与故障。 */
+    public io.agentsecurity.core.health.WorkerHealth health() {
+        return new io.agentsecurity.core.health.WorkerHealth(
+                writer.getActiveCount(),
+                writer.getQueue().size(),
+                1,
+                capacity,
+                writer.isShutdown(),
+                failed.get(),
+                timeouts.sum(),
+                errors.sum(),
+                rejected.sum(),
+                interrupted.sum());
     }
 
     private void cancel(Future<?> pending) {

@@ -67,6 +67,7 @@ public final class Bridge {
 
     public static void transformationFailed() {
         transformationFailed = true;
+        io.agentsecurity.core.health.AgentCoverage.global().transformationFailed();
     }
 
     public static Object guardStream(Object request, Object handler) {
@@ -273,6 +274,7 @@ public final class Bridge {
 
     private static void verifyVersion(ClassLoader loader) {
         if (loader == null) {
+            io.agentsecurity.core.health.AgentCoverage.global().versionChecked(false);
             throw new SecurityBlockedException("unsupported-classloader");
         }
         if (checkedLoaders.containsKey(loader)) {
@@ -286,11 +288,17 @@ public final class Bridge {
             }
             Properties p = new Properties();
             p.load(stream);
-            if (!"1.20.0".equals(p.getProperty("version"))) {
+            if (!io.agentsecurity.core.health.AgentCoverage.SUPPORTED_LANGCHAIN4J.equals(
+                    p.getProperty("version"))) {
                 throw new SecurityBlockedException("unsupported-langchain4j-version");
             }
             checkedLoaders.put(loader, Boolean.TRUE);
+            io.agentsecurity.core.health.AgentCoverage.global().versionChecked(true);
+        } catch (SecurityBlockedException denied) {
+            io.agentsecurity.core.health.AgentCoverage.global().versionChecked(false);
+            throw denied;
         } catch (java.io.IOException e) {
+            io.agentsecurity.core.health.AgentCoverage.global().versionChecked(false);
             throw new SecurityBlockedException("version-check-error");
         }
     }

@@ -167,6 +167,20 @@ public class BootFixture implements ApplicationRunner {
             blocked = true;
             System.out.println("BLOCK_REASON=" + error.getMessage());
         }
+        var coverage = io.agentsecurity.core.health.AgentCoverage.global().snapshot();
+        if (!coverage.installed()
+                || coverage.failed()
+                || coverage.transformations() == 0
+                || coverage.detector() == null
+                || coverage.audit() == null
+                || coverage.versionChecksPassed() == 0
+                || coverage.versionChecksFailed() != 0) {
+            throw new IllegalStateException("Agent diagnostics missing across Boot classloader");
+        }
+        if (scenario.equals("plugin-timeout") && coverage.detector().timeouts() == 0) {
+            throw new IllegalStateException("Detector timeout not visible in diagnostics");
+        }
+        System.out.println("AGENT_HEALTH_OK");
         System.out.printf(
                 "BOOT_RESULT scenario=%s blocked=%s modelCalls=%d toolCalls=%d chunks=%d%n",
                 scenario, blocked, modelCalls.get(), toolCalls.get(), chunks.get());

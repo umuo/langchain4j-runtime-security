@@ -122,6 +122,8 @@ public final class AgentInstrumentation {
                                             JavaModule module,
                                             boolean loaded,
                                             DynamicType dynamicType) {
+                                        io.agentsecurity.core.health.AgentCoverage.global()
+                                                .transformed(type.getName());
                                         System.err.println(
                                                 "[agent-security] instrumented=" + type.getName());
                                     }

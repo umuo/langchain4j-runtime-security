@@ -55,6 +55,11 @@ public final class PolicyEngine implements AutoCloseable {
         this.telemetry = java.util.Objects.requireNonNull(telemetry);
     }
 
+    /** 派生引擎共享执行池及其统计；仅覆盖隔离检测执行，包括 SPI 加载。 */
+    public io.agentsecurity.core.health.WorkerHealth detectorHealth() {
+        return executor.health();
+    }
+
     public PolicyEngine withAdditionalDetectors(List<Detector> additional) {
         var combined = new java.util.ArrayList<>(detectors);
         combined.addAll(additional);

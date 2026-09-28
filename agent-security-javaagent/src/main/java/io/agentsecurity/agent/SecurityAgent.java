@@ -9,5 +9,6 @@ public final class SecurityAgent {
     public static void premain(String arguments, Instrumentation instrumentation) throws Exception {
         AgentBootstrap.initialize(arguments, instrumentation);
         AgentInstrumentation.install(instrumentation);
+        io.agentsecurity.core.health.AgentCoverage.global().installed();
     }
 }

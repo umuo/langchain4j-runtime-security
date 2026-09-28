@@ -100,7 +100,7 @@ var runtime = new AgentRuntime(definitions, limits, auditSink, telemetry);
 | P0 | 导出适配器后续验收 | 已有 Prometheus 文本与 OTLP/HTTP 日志；补真实 Collector／监控后端、TLS 和长期断网验收 |
 | P0 | 生命周期后续验收 | 已有逐节点终止、后台过期、run 采样及状态指标；继续验证大子树终止延迟，后续接入完整 span |
 | P0 | 性能和长期压力验收 | 已有 [本机诊断基线](performance-baseline.md) 与消费者停滞验证；真实链路、长时间断网和内存剖析待完成 |
-| P1 | 检测／审计／插桩健康指标 | 区分检测执行、审计等待、队列饱和与转换失败；说明未覆盖路径 |
+| P1 | 检测／审计／插桩健康指标 | 已提供执行池状态与故障计数、插桩通知及版本检查快照；方法级覆盖和引擎外拒绝统一仍待补齐，见 [运行时诊断](runtime-diagnostics.md) |
 | P1 | 面向业务的安全看板和告警 | 能由拒绝率或超时异常定位 run 和父子执行，并跳转审计规则；配置告警阈值 |
 | P1 | 跨进程认证与委托 | 可信签发方、受众绑定、短期凭据、权限收窄、重放防护、密钥轮换和服务端授权 |
 | P2 | 远程检测和覆盖扩展 | 有界调用远程检测，验证 MCP 等新增拦截边界，建立误报／漏报评估集 |
@@ -180,7 +180,7 @@ HTTP 429/502/503/504 与连接故障可有限重试；没有 `Retry-After` 时�
 
 ### 协议依据与验证范围
 
-实现依据 [OTLP 传输规范](https://opentelemetry.io/docs/specs/otlp/) 的 JSON 日志、部分成功和重试规则，以及 [Prometheus 文本格式](https://prometheus.io/docs/instrumenting/exposition_formats/)。本地测试使用真实 HTTP 客户端和模拟协议端点，覆盖 JSON、认证头、脱敏、临时／永久失败、部分成功、超限、超时与关闭。尚未在真实 Collector、Prometheus 服务和生产 TLS 环境完成端到端验收；不能把协议端点测试写成监控平台验收通过。
+实现依据 [OTLP 传输规范](https://opentelemetry.io/docs/specs/otlp/) 的 JSON 日志、部分成功和重试规则，以及 [Prometheus 文本格式](https://prometheus.io/docs/instrumenting/exposition_formats/)。本地测试使用真实 HTTP 客户端和模拟协议端点，覆盖 JSON、认证头、脱敏、临时／永久失败、部分成功、超限、超时与关闭。后续已完成本机真实 Collector HTTP/TLS/mTLS 独立验收，见下文链接；真实 Prometheus 服务和生产 TLS 环境仍待验证，不能把协议端点测试写成监控平台验收通过。
 
 ### 生命周期状态指标与升级
 

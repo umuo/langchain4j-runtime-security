@@ -89,6 +89,72 @@ public final class PrometheusMetrics {
         return text.toString();
     }
 
+    /** 独立诊断指标片段；宿主可与 render 结果拼接，只暴露一个引擎或先自行聚合。 */
+    public static String renderHealth(
+            io.agentsecurity.core.health.WorkerHealth detector,
+            io.agentsecurity.core.health.WorkerHealth audit,
+            io.agentsecurity.core.health.AgentCoverage.Snapshot coverage) {
+        var text = new StringBuilder();
+        worker(text, "detector", detector);
+        worker(text, "audit", audit);
+        if (coverage != null) {
+            scalar(
+                    text,
+                    "agent_security_version_checks_passed_total",
+                    "counter",
+                    coverage.versionChecksPassed());
+            scalar(
+                    text,
+                    "agent_security_version_checks_failed_total",
+                    "counter",
+                    coverage.versionChecksFailed());
+            scalar(
+                    text,
+                    "agent_security_instrumentation_installed",
+                    "gauge",
+                    coverage.installed() ? 1 : 0);
+            scalar(
+                    text,
+                    "agent_security_instrumentation_failed",
+                    "gauge",
+                    coverage.failed() ? 1 : 0);
+            scalar(
+                    text,
+                    "agent_security_transformations_total",
+                    "counter",
+                    coverage.transformations());
+            scalar(
+                    text,
+                    "agent_security_transformation_failure_signals_total",
+                    "counter",
+                    coverage.failures());
+            scalar(
+                    text,
+                    "agent_security_transformed_names_omitted_total",
+                    "counter",
+                    coverage.omittedNames());
+        }
+        return text.toString();
+    }
+
+    private static void worker(
+            StringBuilder text, String kind, io.agentsecurity.core.health.WorkerHealth state) {
+        if (state == null) {
+            return;
+        }
+        String prefix = "agent_security_" + kind + "_";
+        scalar(text, prefix + "active", "gauge", state.active());
+        scalar(text, prefix + "queued", "gauge", state.queued());
+        scalar(text, prefix + "concurrency", "gauge", state.concurrency());
+        scalar(text, prefix + "queue_capacity", "gauge", state.capacity());
+        scalar(text, prefix + "closed", "gauge", state.closed() ? 1 : 0);
+        scalar(text, prefix + "failed", "gauge", state.failed() ? 1 : 0);
+        scalar(text, prefix + "timeouts_total", "counter", state.timeouts());
+        scalar(text, prefix + "errors_total", "counter", state.errors());
+        scalar(text, prefix + "rejected_total", "counter", state.rejected());
+        scalar(text, prefix + "interrupted_total", "counter", state.interrupted());
+    }
+
     private static void scalar(StringBuilder text, String name, String type, long value) {
         text.append("# TYPE ").append(name).append(' ').append(type).append('\n');
         text.append(name).append(' ').append(value).append('\n');

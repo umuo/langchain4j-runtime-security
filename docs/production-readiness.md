@@ -84,3 +84,12 @@ Memory 新增 9 项单元测试和 23 项 Boot 独立 JVM 场景，覆盖读写�
 macOS arm64 / JDK 21.0.4 本机矩阵已通过；验收器另有 7 个反例测试通过，core / telemetry 的 76 项测试通过，全部模块格式与静态检查及 Wiki 严格构建通过。本轮没有修改运行时代码，未重跑完整 315 项发布矩阵。已接入 JDK 17/21 CI，但没有远端成功记录。命令、通过标准、原始报告及缺口见 [Collector 与 TLS 验收](collector-acceptance.md)。
 
 这些结果不证明远端存储可靠性、证书轮换、Collector 重启恢复、真实业务长期性能或完整生产就绪。
+
+
+## 覆盖与健康诊断
+
+2026-09-28，完整 `scripts/release.sh` 通过 **320 项测试，零失败、零错误、零跳过**：core 65、policy 57、telemetry 16、Agent 57、普通 Java 41、Boot 84。四个运行时 JAR 的隔离重建 SHA-256 一致，生成 SBOM 和发布校验和。环境仍为 macOS arm64 / JDK 21.0.4，不能据此声明远端 CI 或跨平台验收通过。
+
+新增 `PolicyEngine.detectorHealth()`、`BoundedAuditSink.health()`、`AgentCoverage.global().snapshot()` 和 `PrometheusMetrics.renderHealth(...)`。可查询线程池活动/排队、故障分类计数、插桩通知、版本检查，以及有界类名清单。新增测试覆盖不响应中断的检测器仍可见、派生引擎共享计数、审计粘滞故障、不可变有界快照和指标脱敏；现有 Boot 25 场景补入共享诊断断言。
+
+本轮完成诊断基础，不提供方法级完整覆盖证明；检测/审计等待耗时细分、引擎外准入失败的统一事件、未适配方法扫描及覆盖报告仍待实现。接入与指标语义见 [运行时覆盖与健康诊断](runtime-diagnostics.md)。下一项功能迭代为远程安全检测客户端。

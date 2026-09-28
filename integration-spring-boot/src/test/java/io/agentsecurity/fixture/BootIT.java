@@ -83,6 +83,7 @@ class BootIT {
         }
         String output = Files.readString(log);
         assertEquals(0, process.exitValue(), output);
+        assertTrue(output.contains("AGENT_HEALTH_OK"), output);
         assertTrue(
                 output.contains(
                         "BOOT_RESULT scenario="
