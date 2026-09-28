@@ -431,3 +431,8 @@ Spring 应用可以用已注入业务服务的 Detector Bean 来构造这个手�
 ## 可观测性扩展
 
 安全指标与父子执行关联记录通过 `SecurityTelemetry.snapshot()` 和 `drain()` 提供，导出适配器在宿主独立线程中拉取，不参与安全决策链。无需 Spring，也无需替换检测器或安全审计。完整示例、Java Agent 开关、容量及采样限制见 [可观测性指南](observability.md)。
+
+
+## 远程检测扩展
+
+需要将专属检测逻辑放在独立服务时，可使用 policy 模块的 RemoteHttpDetector，再以普通 SDK 或应用 Detector SPI 接入。该客户端提供固定协议、显式内容最小化、认证头、请求/响应上限、并发名额和故障拒绝。完整服务端协议、接入示例与错误标识见 [远程安全检测客户端](remote-detector.md)。

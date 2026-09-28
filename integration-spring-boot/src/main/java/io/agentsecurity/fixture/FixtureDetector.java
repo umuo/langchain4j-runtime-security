@@ -7,9 +7,14 @@ import io.agentsecurity.core.SecurityEvent;
 
 /** 应用侧检测器 SPI 测试实现，模拟授权、拒绝、超时与异常；不访问外部服务。 */
 public final class FixtureDetector implements Detector {
+    static volatile Detector remote;
 
     @Override
     public Decision evaluate(SecurityEvent event) {
+        var configured = remote;
+        if (configured != null) {
+            return configured.evaluate(event);
+        }
         // Fixture ACL represents a trusted resource-owner lookup, independent of the requested
         // memory ID.
         if (event.resource() != null

@@ -118,7 +118,9 @@ public class BootFixture implements ApplicationRunner {
         }
         boolean blocked = false;
         try {
-            if (scenario.startsWith("http-")) {
+            if (scenario.startsWith("remote-")) {
+                RemoteFixture.run(scenario);
+            } else if (scenario.startsWith("http-")) {
                 runHttp(scenario);
             } else if (scenario.startsWith("args-")) {
                 String arguments =

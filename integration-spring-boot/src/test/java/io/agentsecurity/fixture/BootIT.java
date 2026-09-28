@@ -15,6 +15,10 @@ class BootIT {
 
     @ParameterizedTest
     @CsvSource({
+        "remote-allowed,false,1,0",
+        "remote-denied,true,0,0",
+        "remote-auth,true,0,0",
+        "remote-malformed,true,0,0",
         "tool,true,1,0",
         "allowed,false,2,1",
         "plugin,true,0,0",
@@ -53,6 +57,9 @@ class BootIT {
         }
         properties.setProperty("audit.path", audit.toString());
         properties.setProperty("policy.version", "boot-test-v1");
+        if (scenario.startsWith("remote-")) {
+            properties.setProperty("detector.timeout.millis", "3000");
+        }
         if (scenario.startsWith("args-")) {
             properties.setProperty(
                     "tool.policy.path", root.resolve("config/tool-policy-example.json").toString());
@@ -101,6 +108,23 @@ class BootIT {
         assertTrue(journal.contains("\"policyVersion\":\"boot-test-v1\""), journal);
         assertFalse(journal.contains("DEMO_SECRET_123"));
         assertFalse(journal.contains("PLUGIN_"));
+        assertFalse(journal.contains("REMOTE_REQUEST_SECRET"));
+        assertFalse(output.contains("fixture-auth-token"));
+        if (scenario.startsWith("remote-")) {
+            int expectedRequests = scenario.equals("remote-allowed") ? 3 : 1;
+            assertTrue(output.contains("REMOTE_REQUESTS=" + expectedRequests), output);
+            assertTrue(output.contains("REMOTE_UNIQUE_EVENTS=" + expectedRequests), output);
+            if (blocked) {
+                assertTrue(
+                        output.contains(
+                                scenario.equals("remote-denied")
+                                        ? "remote-denied"
+                                        : scenario.equals("remote-auth")
+                                                ? "detector-remote-auth"
+                                                : "detector-remote-protocol"),
+                        output);
+            }
+        }
         assertFalse(journal.contains("sensitive detector detail"));
         assertEquals(blocked, journal.contains("\"decision\":\"DENY\""), journal);
         if (blocked && (scenario.contains("stream") || scenario.contains("reactive"))) {
