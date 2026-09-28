@@ -9,6 +9,7 @@ import java.util.function.BiConsumer;
 public final class PolicyEngine implements AutoCloseable {
 
     private final List<Detector> detectors;
+    private final io.agentsecurity.core.versioning.VersionedDetector versioned;
 
     private final BiConsumer<SecurityEvent, Decision> audit;
 
@@ -48,6 +49,20 @@ public final class PolicyEngine implements AutoCloseable {
             boolean owner,
             SecurityTelemetry telemetry) {
         this.detectors = List.copyOf(detectors);
+        var sources =
+                this.detectors.stream()
+                        .filter(
+                                io.agentsecurity.core.versioning.VersionedDetector.class
+                                        ::isInstance)
+                        .toList();
+        if (sources.size() > 1) {
+            throw new IllegalArgumentException(
+                    "Only one versioned policy source is supported per engine");
+        }
+        versioned =
+                sources.isEmpty()
+                        ? null
+                        : (io.agentsecurity.core.versioning.VersionedDetector) sources.get(0);
         this.audit = java.util.Objects.requireNonNull(audit);
         this.limits = limits;
         this.executor = executor;
@@ -64,6 +79,24 @@ public final class PolicyEngine implements AutoCloseable {
         var combined = new java.util.ArrayList<>(detectors);
         combined.addAll(additional);
         return new PolicyEngine(combined, audit, limits, executor, false, telemetry);
+    }
+
+    /** 显式固定一个策略版本用于完整任务，异步任务应传递此视图；共享池由原引擎关闭。 */
+    public PolicyEngine pinPolicy() {
+        if (versioned == null) {
+            throw new IllegalStateException("No versioned policy source");
+        }
+        var revision =
+                java.util.Objects.requireNonNull(
+                        executor.run(
+                                versioned::snapshot,
+                                System.nanoTime() + limits.timeout().toNanos()));
+        io.agentsecurity.core.versioning.VersionedDetector fixed = () -> revision;
+        var selected =
+                detectors.stream()
+                        .map(detector -> detector == versioned ? (Detector) fixed : detector)
+                        .toList();
+        return new PolicyEngine(selected, audit, limits, executor, false, telemetry);
     }
 
     /** SPI 的延迟加载也受执行时限约束，避免扩展初始化阻塞受保护调用。 */
@@ -97,7 +130,23 @@ public final class PolicyEngine implements AutoCloseable {
         if (executor.isClosed()) {
             decision = Decision.deny("detector-closed");
         }
-        for (Detector detector : detectors) {
+        String policyVersion = versioned == null ? null : "unresolved";
+        io.agentsecurity.core.versioning.PolicyRevision revision = null;
+        if (versioned != null && decision.allowed()) {
+            try {
+                revision =
+                        java.util.Objects.requireNonNull(
+                                executor.run(versioned::snapshot, deadline));
+                policyVersion = revision.version();
+            } catch (SecurityBlockedException denied) {
+                decision = Decision.deny(denied.ruleId());
+            } catch (RuntimeException invalid) {
+                decision = Decision.deny("detector-error");
+            }
+        }
+        for (Detector configured : detectors) {
+            Detector detector =
+                    configured == versioned && revision != null ? revision.detector() : configured;
             if (!decision.allowed()) {
                 break;
             }
@@ -130,6 +179,7 @@ public final class PolicyEngine implements AutoCloseable {
         if (decision.allowed()) {
             decision = DelegationGuard.evaluate(event);
         }
+        decision = new Decision(decision.allowed(), decision.ruleId(), policyVersion);
         // 审计成功是放行的前置条件，写入失败时不得继续执行受保护操作。
         try {
             audit.accept(event, decision);

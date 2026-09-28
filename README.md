@@ -218,7 +218,7 @@ audit.queue.capacity=128
 
 没有外部模型推理效果或性能数据；官方客户端连接本机端点的测试证明指定边界的工程行为，不证明提示注入检测准确率。
 
-已补远程检测客户端与运行健康指标；后续推进策略版本管理、MCP 独立适配、事件去重、性能和发布验收。RAG 与 memory 的接入及未覆盖路径见 [RAG](docs/rag-security.md) 和 [ChatMemory](docs/memory-security.md)。当前仍不能标记为完整生产可用。
+已补远程检测客户端与运行健康指标；已提供 [策略原子发布与回滚](docs/policy-versioning.md)；后续推进 MCP 独立适配、事件去重、性能和发布验收。RAG 与 memory 的接入及未覆盖路径见 [RAG](docs/rag-security.md) 和 [ChatMemory](docs/memory-security.md)。当前仍不能标记为完整生产可用。
 
 ## 流式安全模式
 

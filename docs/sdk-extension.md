@@ -436,3 +436,8 @@ Spring 应用可以用已注入业务服务的 Detector Bean 来构造这个手�
 ## 远程检测扩展
 
 需要将专属检测逻辑放在独立服务时，可使用 policy 模块的 RemoteHttpDetector，再以普通 SDK 或应用 Detector SPI 接入。该客户端提供固定协议、显式内容最小化、认证头、请求/响应上限、并发名额和故障拒绝。完整服务端协议、接入示例与错误标识见 [远程安全检测客户端](remote-detector.md)。
+
+
+## 策略发布与回滚
+
+需要不停机更新规则时，可使用 PolicyCompiler + AtomicPolicy，并通过 VersionedDetector SPI 接入。单次检查固定快照，可靠审计记录所选版本；普通 SDK 可用 pinPolicy() 显式固定任务视图。管理鉴权、持久化与跨节点发布仍由宿主负责。完整示例与限制见 [策略版本与回滚](policy-versioning.md)。

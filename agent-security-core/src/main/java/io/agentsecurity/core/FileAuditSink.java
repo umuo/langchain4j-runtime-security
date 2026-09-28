@@ -94,7 +94,9 @@ public final class FileAuditSink implements BiConsumer<SecurityEvent, Decision>,
                         + "\",\"ruleId\":\""
                         + decision.ruleId()
                         + "\",\"policyVersion\":\""
-                        + policyVersion
+                        + (decision.policyVersion() == null
+                                ? policyVersion
+                                : decision.policyVersion())
                         + "\"}\n";
         byte[] bytes = line.getBytes(StandardCharsets.UTF_8);
         try {

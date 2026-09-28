@@ -103,4 +103,15 @@ policy 模块新增 RemoteHttpDetector，提供固定可信端点、显式内容
 
 新增 23 项客户端测试及 4 个真实 Boot SPI 场景。正常模型调用经过三个独立输入检查事件；拒绝、认证失败或非法响应在首个检查阻断，实际模型调用为零。接入与服务端协议见 [远程检测客户端](remote-detector.md)。没有将本机 HTTP 或 Collector TLS 证据当作真实检测服务的 TLS、检测准确率或长期压力验收。
 
-下一项功能迭代为专属策略版本管理、原子更新与回滚；MCP、防重放跨服务委托等仍按路线推进。
+后续已增加专属策略版本管理、原子更新与回滚基础能力，见下一节；MCP、防重放跨服务委托等仍按路线推进。
+
+
+## 策略版本管理、原子发布与回滚
+
+2026-09-28，完整 release.sh 通过 **356 项测试，零失败、零错误、零跳过**：core 70、policy 83、telemetry 16、Agent 57、普通 Java 42、Boot 88。四个运行时 JAR 隔离重建 SHA-256 一致，生成 SBOM；环境为 macOS arm64 / JDK 21.0.4。文档严格构建通过，并检查普通 demo 的运行 JAR 未包含 SDK 类。
+
+新增 PolicyCompiler、AtomicPolicy、VersionedDetector 和 PolicyEngine.pinPolicy()。候选先编译，基于 generation 乐观并发发布；相同版本不同内容、过期请求和容量超限均拒绝。回滚也递增 generation。单次检查固定快照，最终 Decision 携带版本，文件及 Agent stderr 审计使用所选动态版本。
+
+新增 8 项核心/编译器测试和 1 项真实 Java Agent SPI 测试，验证发布竞争、在途与固定视图一致性、回滚、防止旧请求覆盖、输入不可变性、失败保留有效状态，以及最终文件中的决策版本。SPI 同进程发布 v2 阻断调用，回滚 v1 后恢复，模型实际执行次数为 2。
+
+接入和迁移见 [策略版本管理](policy-versioning.md)。尚未提供管理认证/审批服务、管理变更持久化审计、跨节点发布、重启恢复或 Java Agent 自动按 run 固定版本。PolicyCompiler 只编译本地与工具规则，远程策略服务的版本不自动同步。下一项按路线推进 MCP 独立安全边界。

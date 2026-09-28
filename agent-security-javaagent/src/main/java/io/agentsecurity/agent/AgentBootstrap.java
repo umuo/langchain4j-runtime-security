@@ -118,7 +118,9 @@ final class AgentBootstrap {
                                 decision.allowed() ? "ALLOW" : "DENY",
                                 event.phase(),
                                 decision.ruleId(),
-                                policyVersion,
+                                decision.policyVersion() == null
+                                        ? policyVersion
+                                        : decision.policyVersion(),
                                 event.context() == null || event.context().invocation() == null
                                         ? "none"
                                         : event.context().invocation().invocationId(),
