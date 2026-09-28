@@ -72,7 +72,7 @@ python3 scripts/probe_exporter_recovery.py --failure-mode stall --outage-seconds
 
 ## 尚未验收
 
-本机未发现 Docker 或 Collector 可执行程序，因此本轮没有真实 Collector 部署验收。后续需要固定版本及可核验产物，验证实际日志接收／落盘、认证、TLS、限流、网络分区和持久化恢复。这些本机注入仍不能代表 DNS、TLS 或 TCP 黑洞；短时探针不能替代数小时压力验证。
+早期探针运行时本机没有 Docker 或 Collector，因此这些探针本身没有完成真实接入验收。后续已增加固定版本 Collector 的独立 HTTP／HTTPS／mTLS 八场景验收，见 [Collector 与 TLS 验收](collector-acceptance.md)。限流、网络分区、持久化恢复和数小时压力仍待完成；不能把两套测试的范围混为一谈。
 
 
 ## 已保存的本机运行报告

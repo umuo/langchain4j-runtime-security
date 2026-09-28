@@ -33,6 +33,10 @@ jobs:
           for mode in unavailable disconnect stall; do
             python3 scripts/probe_exporter_recovery.py --outage-seconds 1 --recovery-seconds 2 --failure-mode "$mode" --output "target/benchmarks/recovery-$mode.json"
           done
+      - name: Test acceptance evidence verifier
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Accept real Collector HTTP, TLS, and mTLS
+        run: python3 scripts/accept_collector.py --download-collector
       - name: Preserve test and release evidence
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -46,3 +50,4 @@ jobs:
             target/release/**
             target/reproducibility.log
             target/benchmarks/**
+            target/collector-acceptance/**

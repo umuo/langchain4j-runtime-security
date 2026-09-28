@@ -1,0 +1,127 @@
+{
+  "schemaVersion": 1,
+  "passed": true,
+  "createdAt": "2026-09-28T05:00:15.056977+00:00",
+  "collectorVersion": "otelcol-contrib version 0.147.0",
+  "archiveSha256": "3b79e51fbd0a1eecba7c0f90f4022cf5b498ee7f19d34674f4eef8b0f1f24162",
+  "binarySha256": "ae9e91c0a092a61658c9cca061d10ed0e0c3aac073707a6b70c3b235ce7fed73",
+  "platform": "macOS-15.3.2-arm64-arm-64bit",
+  "java": "openjdk version \"21.0.4\" 2024-07-16 LTS\nOpenJDK Runtime Environment Zulu21.36+17-CA (build 21.0.4+7-LTS)\nOpenJDK 64-Bit Server VM Zulu21.36+17-CA (build 21.0.4+7-LTS, mixed mode, sharing)\n",
+  "artifactSha256": {
+    "agent-security-core-0.1.0-SNAPSHOT.jar": "35acfd7905508f2708f8ffebaa5febbfcb12d5477a4ebb5fb46149bfee616403",
+    "agent-security-telemetry-0.1.0-SNAPSHOT.jar": "421d506ade37486c7605bc0d69daa0c857c6eb0a850dee17b4883f13207f083a",
+    "jackson-core-2.22.1.jar": "941ff029bcdb93e83d209ce516c1a7fb8bbac07d0a2fa122f5bf194b2cd7b4f4"
+  },
+  "sourceSha256": {
+    "scripts/accept_collector.py": "5e642512c352b150e9f1707f6f989b371fdff3ef815d97f966101033fc07626b",
+    "benchmarks/CollectorAcceptanceProbe.java": "5d4bb58bad3f900c6647241cb2d729ae60b364415458b7a47c97e91721c94ec4"
+  },
+  "cases": [
+    {
+      "name": "http",
+      "passed": true,
+      "accepted": 105,
+      "dropped": 0,
+      "failures": 0,
+      "allowedSideEffects": 50,
+      "sinkRecords": 105
+    },
+    {
+      "name": "https",
+      "passed": true,
+      "accepted": 105,
+      "dropped": 0,
+      "failures": 0,
+      "allowedSideEffects": 50,
+      "sinkRecords": 105
+    },
+    {
+      "name": "untrusted-server",
+      "passed": true,
+      "accepted": 0,
+      "dropped": 105,
+      "failures": 2,
+      "allowedSideEffects": 50,
+      "sinkRecords": 0
+    },
+    {
+      "name": "hostname-mismatch",
+      "passed": true,
+      "accepted": 0,
+      "dropped": 105,
+      "failures": 2,
+      "allowedSideEffects": 50,
+      "sinkRecords": 0
+    },
+    {
+      "name": "expired-server",
+      "passed": true,
+      "accepted": 0,
+      "dropped": 105,
+      "failures": 2,
+      "allowedSideEffects": 50,
+      "sinkRecords": 0
+    },
+    {
+      "name": "mtls",
+      "passed": true,
+      "accepted": 105,
+      "dropped": 0,
+      "failures": 0,
+      "allowedSideEffects": 50,
+      "sinkRecords": 105
+    },
+    {
+      "name": "missing-client",
+      "passed": true,
+      "accepted": 0,
+      "dropped": 105,
+      "failures": 2,
+      "allowedSideEffects": 50,
+      "sinkRecords": 0
+    },
+    {
+      "name": "untrusted-client",
+      "passed": true,
+      "accepted": 0,
+      "dropped": 105,
+      "failures": 2,
+      "allowedSideEffects": 50,
+      "sinkRecords": 0
+    }
+  ],
+  "evidenceSha256": {
+    "expired-server/client.json": "a8201f1f3dd8c9ffd462907be69f7ea92a5ca8ab4f954ac83daa1a11167852ab",
+    "expired-server/collector.json": "ea32dd10e4e39836403fd640b5300e52c26312598ba7810023d4aa5de5cf5fe9",
+    "expired-server/collector.log": "cb54ab781b3cb2fc44e592ad94cf4a2de4ebeabd42ab9cde00f07b9f22deb445",
+    "expired-server/logs.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "hostname-mismatch/client.json": "53edee874234e557f76a6f587e3b0b3f8a8ace00cd5be3792445ac6558fc617f",
+    "hostname-mismatch/collector.json": "b72179c6148cca034abb43b5c07f1b9259748d334167c51da26c1450f770c8c2",
+    "hostname-mismatch/collector.log": "bac4dfbb064f72ba1ed3093ffd31b1f32dc7cbc1cdf9f4d20c5b70755a2b6f68",
+    "hostname-mismatch/logs.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "http/client.json": "0d0745bc3a205a13e885614aa57fcc2fbed8bc82dadb1795d3f150fb491ece8b",
+    "http/collector.json": "af047e163cac51cb7b8295ab0696c7fbc6d5501e234352a397f02afdf1650208",
+    "http/collector.log": "bd29c4c091fc283208cb3cf1060c36a40e56ca44f11af785adc463939f6f3c0d",
+    "http/logs.jsonl": "9ea2d334861a95d36ee8ad10306a755cbdf607cd9610f464bbf737b3f89f03f8",
+    "https/client.json": "ceedcc3d96d3cb5f74e4acdcefece7653286d6e48b6bf46efc5386d072324ad6",
+    "https/collector.json": "280d0e9b0d7c3fbd605e29fce4f6626ad906513eb9be6755c8caec2d2c37e30b",
+    "https/collector.log": "270c06f2f0e9856bc4192997ec27e2fec32053a0aa3aeb220dfa4508fedb391e",
+    "https/logs.jsonl": "ef4dddd3f520acb0d2082a7cbe8ebcca3f0a21a10e6f728e5c04817afd85d2ff",
+    "missing-client/client.json": "76b594c0bf5d94d7f27df7b3d3d867bb72dee98e9bd420c4c2d0a793167dcce8",
+    "missing-client/collector.json": "3bf3791b8b597c9c1a52a3e03a820ddf47c440ae25b6da0b380281ae915ff615",
+    "missing-client/collector.log": "30514629dd96d717f808c7b5e109ac206f57532d2e056531eba4abd452169ed4",
+    "missing-client/logs.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "mtls/client.json": "8bcd0d48ef738ad9d3f524eb48ec1426e9e27bafec4843529e81b844be05a1bf",
+    "mtls/collector.json": "ed16e1207d89b3a152d8d0caf0052384983886d7baa4233745159a101c0a135e",
+    "mtls/collector.log": "c0e9ab582077f5a600ffdf3c4b51a9218cccdc34d4c24f48fc824c402470c2fd",
+    "mtls/logs.jsonl": "1b6d1f61a80026a4a8e0d5cf7ded0b2fd40e95f41cdb5bf6910816390fcd8df4",
+    "untrusted-client/client.json": "d7354ad1bf4b99895c6cc1db45fe7f3cf041d6749154cf626b231448e1d56267",
+    "untrusted-client/collector.json": "137c9ecc97125c9627c1d998cb954236677b681d2bd8c736c0ae38f6937aa30b",
+    "untrusted-client/collector.log": "c52e7349c4c433378dfa55b37aec12df5be0e60647aa7ffb7a8ae542d24936df",
+    "untrusted-client/logs.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "untrusted-server/client.json": "b8fe5bc840e590d90693ac304e98e4d25c13fd48e5854605d5760b2eaa6f996b",
+    "untrusted-server/collector.json": "c631e0b3cb037ff1672b92ca82f3a073947b15ad3ef7ef9c2980a09d11652032",
+    "untrusted-server/collector.log": "aee5e099910148e92176936234ef88a062b72ad429f2a6bbfef8c23a9ddc15c4",
+    "untrusted-server/logs.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
