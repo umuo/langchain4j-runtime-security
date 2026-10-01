@@ -61,6 +61,7 @@ nav:
       - MCP 工具边界: mcp-security.md
       - MCP 资源与提示词: mcp-content-security.md
       - MCP 发现与容量限制: mcp-discovery-limits.md
+      - MCP 分页与诊断指标: mcp-pagination-metrics.md
       - 工具权限与参数规则: tool-policy.md
       - 可信身份与异步传播: security-context.md
       - RAG 检索安全: rag-security.md

@@ -62,9 +62,19 @@ class McpTransportIT {
                                                 "listTools,schema,denied-text,1",
                                                 "listPrompts,schema,denied-text,1",
                                                 "listResources,metadata,mcp-discovery-metadata-unsupported,1",
-                                                "listTools,limit,mcp-content-limit,1",
+                                                "listTools,limit,mcp-pagination-items,1",
                                                 "listTools,cached,agent-tool-denied,1",
-                                                "tool,wire,mcp-response-limit,1")
+                                                "tool,wire,mcp-response-limit,1",
+                                                "listTools,paged-ok,allow,2",
+                                                "listResources,paged-ok,allow,2",
+                                                "listResourceTemplates,paged-ok,allow,2",
+                                                "listPrompts,paged-ok,allow,2",
+                                                "listTools,paged-pages,mcp-pagination-pages,4",
+                                                "listTools,paged-items,mcp-pagination-items,2",
+                                                "listTools,paged-bytes,mcp-pagination-bytes,2",
+                                                "listTools,paged-cursor,mcp-pagination-cursor,2",
+                                                "listTools,paged-long-cursor,mcp-pagination-cursor,1",
+                                                "listTools,paged-empty,mcp-pagination-pages,2")
                                         .stream()
                                         .map(
                                                 value -> {
@@ -105,6 +115,15 @@ class McpTransportIT {
         properties.setProperty("deny.text", "secret-marker");
         if (scenario.equals("wire")) {
             properties.setProperty("mcp.max.response.bytes", "1024");
+        }
+        if (scenario.equals("paged-pages") || scenario.equals("paged-empty")) {
+            properties.setProperty("mcp.pagination.max.pages", "2");
+        }
+        if (scenario.equals("paged-items")) {
+            properties.setProperty("mcp.pagination.max.items", "1");
+        }
+        if (scenario.equals("paged-bytes")) {
+            properties.setProperty("mcp.pagination.max.json.bytes", "1024");
         }
         properties.setProperty("detector.timeout.millis", "3000");
         Path config = directory.resolve("policy.properties");

@@ -151,7 +151,11 @@ public final class McpTransportApplication {
                         root.call(operation);
                     }
                 } else {
-                    operation.call();
+                    Object result = operation.call();
+                    if (scenario.equals("paged-ok")
+                            && (!(result instanceof List<?> list) || list.size() != 2)) {
+                        throw new AssertionError("Expected two aggregated items");
+                    }
                 }
             } catch (Exception failure) {
                 Throwable cause = failure;
@@ -176,6 +180,48 @@ public final class McpTransportApplication {
                             || !denied.ruleId().equals("mcp-response-limit")) {
                         throw expected;
                     }
+                }
+            }
+            if (scenario.equals("paged-pages")) {
+                try {
+                    operation.call();
+                    throw new AssertionError("Expected a fresh pagination budget rejection");
+                } catch (SecurityBlockedException denied) {
+                    if (!denied.ruleId().equals("mcp-pagination-pages")) {
+                        throw denied;
+                    }
+                }
+            }
+            var metrics = io.agentsecurity.core.health.McpDiagnostics.global().snapshot();
+            if (scenario.equals("wire")) {
+                var reason =
+                        mode.equals("stdio")
+                                ? io.agentsecurity.core.health.McpDiagnostics.Limit.STDIO_LINE_BYTES
+                                : io.agentsecurity.core.health.McpDiagnostics.Limit
+                                        .HTTP_RESPONSE_BYTES;
+                if (metrics.limits().get(reason) != 1
+                        || metrics.transportFailures() != 1
+                        || metrics.failedStateChecks() < 1) {
+                    throw new AssertionError("Capacity diagnostics incorrect: " + metrics);
+                }
+            }
+            if (scenario.equals("cached") && metrics.paginationStarted() != 1) {
+                throw new AssertionError("Cache incorrectly fetched again");
+            }
+            if (scenario.startsWith("paged-")) {
+                long attempts = scenario.equals("paged-pages") ? 2 : 1;
+                long completed = scenario.equals("paged-ok") ? 1 : 0;
+                long limits = metrics.limits().values().stream().mapToLong(Long::longValue).sum();
+                if (metrics.paginationStarted() != attempts
+                        || metrics.paginationCompleted() != completed
+                        || metrics.paginationFailed() != attempts - completed
+                        || limits != attempts - completed
+                        || metrics.transportFailures() != 0) {
+                    throw new AssertionError("Pagination diagnostics incorrect: " + metrics);
+                }
+                if (scenario.equals("paged-ok")
+                        && (metrics.pagesAccepted() != 2 || metrics.itemsAccepted() != 2)) {
+                    throw new AssertionError("Pagination totals incorrect");
                 }
             }
             long count = Files.exists(journal) ? Files.readAllLines(journal).size() : 0;

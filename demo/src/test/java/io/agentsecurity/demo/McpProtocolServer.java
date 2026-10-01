@@ -117,6 +117,32 @@ public final class McpProtocolServer {
                             if (scenario.equals("metadata")) {
                                 item.put("_meta", Map.of("hidden", "secret-marker"));
                             }
+                            if (scenario.startsWith("paged-")) {
+                                if (scenario.equals("paged-bytes")) {
+                                    item.put("description", "x".repeat(600));
+                                }
+                                var page = new java.util.LinkedHashMap<String, Object>();
+                                page.put(
+                                        field,
+                                        scenario.equals("paged-empty") ? List.of() : List.of(item));
+                                String cursor = input.path("params").path("cursor").asText("");
+                                if (scenario.equals("paged-long-cursor")) {
+                                    page.put("nextCursor", "x".repeat(1025));
+                                } else if (scenario.equals("paged-cursor")) {
+                                    page.put("nextCursor", "repeat");
+                                } else if (scenario.equals("paged-pages")
+                                        || scenario.equals("paged-empty")) {
+                                    page.put(
+                                            "nextCursor",
+                                            cursor.isEmpty()
+                                                    ? "1"
+                                                    : Integer.toString(
+                                                            Integer.parseInt(cursor) + 1));
+                                } else if (cursor.isEmpty()) {
+                                    page.put("nextCursor", "1");
+                                }
+                                yield page;
+                            }
                             yield Map.of(
                                     field,
                                     scenario.equals("limit")

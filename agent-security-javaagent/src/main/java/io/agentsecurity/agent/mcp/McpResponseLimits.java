@@ -1,6 +1,8 @@
 package io.agentsecurity.agent.mcp;
 
 import io.agentsecurity.core.SecurityBlockedException;
+import io.agentsecurity.core.health.McpDiagnostics;
+import io.agentsecurity.core.health.McpDiagnostics.Limit;
 import java.io.FilterInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -68,19 +70,29 @@ public final class McpResponseLimits {
     public static final class State {
         final int maxBytes;
         private final AtomicBoolean failed = new AtomicBoolean();
+        private final McpDiagnostics diagnostics;
 
         public State(int maxBytes) {
+            this(maxBytes, McpDiagnostics.global());
+        }
+
+        public State(int maxBytes, McpDiagnostics diagnostics) {
             this.maxBytes = maxBytes;
+            this.diagnostics = java.util.Objects.requireNonNull(diagnostics);
         }
 
         public void check() {
             if (failed.get()) {
+                diagnostics.failedStateChecked();
                 throw new SecurityBlockedException("mcp-response-limit");
             }
         }
 
-        SecurityBlockedException reject() {
-            failed.set(true);
+        SecurityBlockedException reject(Limit reason) {
+            if (failed.compareAndSet(false, true)) {
+                diagnostics.limit(reason);
+                diagnostics.transportFailed();
+            }
             return new SecurityBlockedException("mcp-response-limit");
         }
     }
@@ -123,7 +135,7 @@ public final class McpResponseLimits {
             if (value == '\n' || value == '\r') {
                 count = 0;
             } else if (++count > state.maxBytes) {
-                var denied = state.reject();
+                var denied = state.reject(Limit.STDIO_LINE_BYTES);
                 try {
                     in.close();
                 } catch (IOException ignored) {

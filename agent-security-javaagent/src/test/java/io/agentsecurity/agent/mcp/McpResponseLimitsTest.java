@@ -84,7 +84,8 @@ class McpResponseLimitsTest {
         Object transport = new Object();
         Object client = new Object();
         McpResponseLimits.bind(client, transport);
-        McpResponseLimits.state(transport).reject();
+        McpResponseLimits.state(transport)
+                .reject(io.agentsecurity.core.health.McpDiagnostics.Limit.HTTP_RESPONSE_BYTES);
         assertThrows(SecurityBlockedException.class, () -> McpResponseLimits.check(client));
         McpResponseLimits.check(new Object());
         var original = new ByteArrayInputStream(new byte[0]);
@@ -104,6 +105,24 @@ class McpResponseLimitsTest {
         assertThrows(
                 IllegalArgumentException.class, () -> McpResponseLimits.initialize(properties));
         McpResponseLimits.initialize(new Properties());
+    }
+
+    @Test
+    void transportFailureIsCountedOnceAndFailedChecksAreSeparate() {
+        var diagnostics = new io.agentsecurity.core.health.McpDiagnostics();
+        var state = new McpResponseLimits.State(4, diagnostics);
+        state.reject(io.agentsecurity.core.health.McpDiagnostics.Limit.STDIO_LINE_BYTES);
+        state.reject(io.agentsecurity.core.health.McpDiagnostics.Limit.STDIO_LINE_BYTES);
+        assertThrows(SecurityBlockedException.class, state::check);
+        assertThrows(SecurityBlockedException.class, state::check);
+        assertEquals(1, diagnostics.snapshot().transportFailures());
+        assertEquals(
+                1,
+                diagnostics
+                        .snapshot()
+                        .limits()
+                        .get(io.agentsecurity.core.health.McpDiagnostics.Limit.STDIO_LINE_BYTES));
+        assertEquals(2, diagnostics.snapshot().failedStateChecks());
     }
 
     private static final class Subscription implements Flow.Subscription {

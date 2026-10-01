@@ -137,6 +137,55 @@ public final class PrometheusMetrics {
         return text.toString();
     }
 
+    /** 独立 MCP 诊断片段；只有固定原因标签，未接 Agent 时不代表已提供保护。 */
+    public static String renderMcp(io.agentsecurity.core.health.McpDiagnostics.Snapshot state) {
+        if (state == null) {
+            return "";
+        }
+        var text = new StringBuilder("# TYPE agent_security_mcp_limit_rejections_total counter\n");
+        for (var reason : io.agentsecurity.core.health.McpDiagnostics.Limit.values()) {
+            text.append("agent_security_mcp_limit_rejections_total{reason=\"")
+                    .append(reason.name())
+                    .append("\"} ")
+                    .append(state.limits().getOrDefault(reason, 0L))
+                    .append('\n');
+        }
+        scalar(
+                text,
+                "agent_security_mcp_transport_failures_total",
+                "counter",
+                state.transportFailures());
+        scalar(
+                text,
+                "agent_security_mcp_failed_state_checks_total",
+                "counter",
+                state.failedStateChecks());
+        scalar(
+                text,
+                "agent_security_mcp_pagination_started_total",
+                "counter",
+                state.paginationStarted());
+        scalar(
+                text,
+                "agent_security_mcp_pagination_completed_total",
+                "counter",
+                state.paginationCompleted());
+        scalar(
+                text,
+                "agent_security_mcp_pagination_failed_total",
+                "counter",
+                state.paginationFailed());
+        scalar(text, "agent_security_mcp_pages_requested_total", "counter", state.pagesRequested());
+        scalar(text, "agent_security_mcp_pages_accepted_total", "counter", state.pagesAccepted());
+        scalar(text, "agent_security_mcp_items_accepted_total", "counter", state.itemsAccepted());
+        scalar(
+                text,
+                "agent_security_mcp_json_bytes_accepted_total",
+                "counter",
+                state.jsonBytesAccepted());
+        return text.toString();
+    }
+
     private static void worker(
             StringBuilder text, String kind, io.agentsecurity.core.health.WorkerHealth state) {
         if (state == null) {

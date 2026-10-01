@@ -42,12 +42,16 @@ final class AgentBootstrap {
         StreamLimits streamLimits = StreamLimits.from(properties);
         RagBridge.initialize(properties);
         io.agentsecurity.agent.mcp.McpResponseLimits.initialize(properties);
+        io.agentsecurity.agent.mcp.McpPagination.initialize(properties);
         MemoryBridge.initialize(properties);
         Properties localProperties = new Properties();
         var streamKeys =
                 java.util.Set.of(
                         "telemetry.enabled",
                         "mcp.max.response.bytes",
+                        "mcp.pagination.max.pages",
+                        "mcp.pagination.max.items",
+                        "mcp.pagination.max.json.bytes",
                         "stream.max.chars",
                         "stream.max.events",
                         "stream.max.active",

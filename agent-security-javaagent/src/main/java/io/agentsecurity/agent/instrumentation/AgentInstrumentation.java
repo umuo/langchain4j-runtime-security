@@ -16,6 +16,7 @@ import io.agentsecurity.agent.instrumentation.advice.McpContentAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpDiscoveryAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpFutureAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpHttpLimitAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpPaginationAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpStdioInputAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpStdioStartAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpSyncAdvice;
@@ -369,6 +370,17 @@ public final class AgentInstrumentation {
                         .transform(
                                 (builder, type, loader, module, domain) ->
                                         builder.visit(
+                                                        Advice.to(McpPaginationAdvice.class)
+                                                                .on(
+                                                                        named("fetchPaginatedList")
+                                                                                .and(
+                                                                                        takesArguments(
+                                                                                                4))
+                                                                                .and(
+                                                                                        isDeclaredBy(
+                                                                                                named(
+                                                                                                        "dev.langchain4j.mcp.client.DefaultMcpClient")))))
+                                                .visit(
                                                         Advice.to(McpDiscoveryAdvice.class)
                                                                 .on(mcpDiscoveryMethods))
                                                 .visit(

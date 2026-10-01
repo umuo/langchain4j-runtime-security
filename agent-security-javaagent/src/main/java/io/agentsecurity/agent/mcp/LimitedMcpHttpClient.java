@@ -141,7 +141,10 @@ public final class LimitedMcpHttpClient extends HttpClient {
                 received += buffer.remaining();
                 if (received > state.maxBytes) {
                     done = true;
-                    var failure = state.reject();
+                    var failure =
+                            state.reject(
+                                    io.agentsecurity.core.health.McpDiagnostics.Limit
+                                            .HTTP_RESPONSE_BYTES);
                     subscription.cancel();
                     delegate.onError(failure);
                     return;
