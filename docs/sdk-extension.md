@@ -449,3 +449,7 @@ Spring 应用可以用已注入业务服务的 Detector Bean 来构造这个手�
 ### MCP 资源与提示词
 
 使用 `McpOperations.resource(server, uri)` / `prompt(server, name)` 生成精确授权名，同时用于本地允许列表与 AgentGrant.tools。新增四个资源/提示词输入输出阶段，资源事件带原始 ResourceRef；配置示例、Detector 扩展点和真实传输验收见 [资源与提示词安全](mcp-content-security.md)。
+
+### MCP 发现操作
+
+使用 `McpOperations.discovery(server, method)` 生成 `allow.mcp.discovery` 与 AgentGrant.tools 的精确授权名。新增 `MCP_DISCOVERY_INPUT/OUTPUT`，发现授权不开放执行；容量配置属于 Agent 传输适配，不能作为 LocalPolicy 属性。参见 [发现与响应容量](mcp-discovery-limits.md)。

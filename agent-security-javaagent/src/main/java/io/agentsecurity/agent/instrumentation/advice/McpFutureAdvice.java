@@ -27,6 +27,7 @@ public final class McpFutureAdvice {
 
     @Advice.OnMethodExit
     public static void exit(
+            @Advice.This Object client,
             @Advice.Argument(0) Object request,
             @Advice.Enter Throwable denied,
             @Advice.Local("mcpContext") SecurityContext context,
@@ -36,6 +37,6 @@ public final class McpFutureAdvice {
                 denied != null
                         ? CompletableFuture.failedFuture(denied)
                         : McpBridge.guardFuture(
-                                request, operation, (CompletableFuture<?>) result, context);
+                                client, request, operation, (CompletableFuture<?>) result, context);
     }
 }

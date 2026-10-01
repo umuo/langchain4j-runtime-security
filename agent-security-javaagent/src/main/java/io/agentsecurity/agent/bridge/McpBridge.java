@@ -38,12 +38,14 @@ public final class McpBridge {
     static String server(Object client) {
         Bridge.verifyBoundary(client);
         VERSIONS.get(client.getClass());
+        io.agentsecurity.agent.mcp.McpResponseLimits.check(client);
         return name(Bridge.call(client, "key"));
     }
 
     public static String before(Object client, Object request) {
         Bridge.verifyBoundary(request);
         VERSIONS.get(client.getClass());
+        io.agentsecurity.agent.mcp.McpResponseLimits.check(client);
         String operation =
                 "mcp:"
                         + name(Bridge.call(client, "key"))
@@ -60,7 +62,8 @@ public final class McpBridge {
         return operation;
     }
 
-    public static void after(Object request, String operation, Object result) {
+    public static void after(Object client, Object request, String operation, Object result) {
+        io.agentsecurity.agent.mcp.McpResponseLimits.check(client);
         if (result == null) {
             throw new SecurityBlockedException("null-result");
         }
@@ -78,6 +81,7 @@ public final class McpBridge {
     }
 
     public static CompletableFuture<?> guardFuture(
+            Object client,
             Object request,
             String operation,
             CompletableFuture<?> future,
@@ -86,7 +90,7 @@ public final class McpBridge {
                 future,
                 context,
                 result -> {
-                    after(request, operation, result);
+                    after(client, request, operation, result);
                     return result;
                 });
     }

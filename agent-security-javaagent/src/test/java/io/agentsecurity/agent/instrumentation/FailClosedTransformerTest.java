@@ -48,4 +48,45 @@ class FailClosedTransformerTest {
         assertNull(failed.get());
         assertEquals(1, signals.get());
     }
+
+    @Test
+    void excludedRuntimeClassesNeverEnterByteBuddyButApplicationFailuresStillReject()
+            throws Exception {
+        var calls = new java.util.concurrent.atomic.AtomicInteger();
+        var signals = new java.util.concurrent.atomic.AtomicInteger();
+        ClassFileTransformer delegate =
+                new ClassFileTransformer() {
+                    @Override
+                    public byte[] transform(
+                            Module module,
+                            ClassLoader loader,
+                            String name,
+                            Class<?> type,
+                            ProtectionDomain domain,
+                            byte[] bytes) {
+                        calls.incrementAndGet();
+                        throw new ClassCircularityError();
+                    }
+                };
+        var transformer =
+                new FailClosedTransformer(delegate, new ThreadLocal<>(), signals::incrementAndGet);
+        for (String name :
+                java.util.List.of(
+                        "java/util/HashMap",
+                        "jdk/internal/Foo",
+                        "sun/security/Foo",
+                        "net/bytebuddy/Foo",
+                        "io/agentsecurity/agent/Foo",
+                        "io/agentsecurity/core/Foo",
+                        "io/agentsecurity/policy/Foo",
+                        "io/agentsecurity/shaded/Foo")) {
+            assertNull(transformer.transform(null, null, name, null, null, new byte[0]));
+        }
+        assertEquals(0, calls.get());
+        assertEquals(0, signals.get());
+        assertArrayEquals(
+                new byte[0],
+                transformer.transform(null, null, "fixture/Foo", null, null, new byte[0]));
+        assertEquals(1, signals.get());
+    }
 }

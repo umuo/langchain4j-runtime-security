@@ -92,9 +92,17 @@ public final class McpTransportApplication {
                         .key(scenario.equals("server") ? "other" : "inventory")
                         .transport(transport)
                         .protocolVersion("2025-11-25")
+                        .toolExecutionTimeout(Duration.ofSeconds(2))
+                        .resourcesTimeout(Duration.ofSeconds(2))
+                        .promptsTimeout(Duration.ofSeconds(2))
                         .build()) {
             Callable<Object> operation =
                     switch (action) {
+                        case "listTools" -> client::listTools;
+                        case "listResources" -> client::listResources;
+                        case "listResourceTemplates" -> client::listResourceTemplates;
+                        case "listPrompts" -> client::listPrompts;
+                        case "instructions" -> client::instructions;
                         case "resource" ->
                                 () ->
                                         client.readResource(
@@ -121,9 +129,12 @@ public final class McpTransportApplication {
                                                 .join();
                         default -> throw new IllegalArgumentException("Unknown action");
                     };
+            if (scenario.equals("cached")) {
+                client.listTools();
+            }
             String rule = "allow";
             try {
-                if (scenario.equals("delegation")) {
+                if (scenario.equals("delegation") || scenario.equals("cached")) {
                     var grant = AgentGrant.tools(Set.of(), Set.of("lookup"));
                     try (var runtime =
                                     new AgentRuntime(
@@ -151,6 +162,21 @@ public final class McpTransportApplication {
                     throw new AssertionError("Unexpected transport failure", failure);
                 }
                 rule = denied.ruleId();
+            }
+            if (scenario.equals("wire")) {
+                try {
+                    operation.call();
+                    throw new AssertionError("Poisoned transport unexpectedly reused");
+                } catch (SecurityBlockedException expected) {
+                    if (!expected.ruleId().equals("mcp-response-limit")) {
+                        throw expected;
+                    }
+                } catch (java.util.concurrent.CompletionException expected) {
+                    if (!(expected.getCause() instanceof SecurityBlockedException denied)
+                            || !denied.ruleId().equals("mcp-response-limit")) {
+                        throw expected;
+                    }
+                }
             }
             long count = Files.exists(journal) ? Files.readAllLines(journal).size() : 0;
             System.out.println("TRANSPORT_RESULT rule=" + rule + " calls=" + count);

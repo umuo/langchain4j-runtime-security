@@ -16,6 +16,11 @@ import org.junit.jupiter.params.provider.MethodSource;
 class McpTransportIT {
     @TempDir Path directory;
 
+    @org.junit.jupiter.api.RepeatedTest(20)
+    void repeatedColdStartInputRejection() throws Exception {
+        actualTransportBoundary("sse", "prompt", "input", "denied-text", 0);
+    }
+
     static Stream<Arguments> scenarios() {
         return Stream.of("http", "sse", "stdio")
                 .flatMap(
@@ -42,7 +47,24 @@ class McpTransportIT {
                                                 "prompt,delegation,agent-tool-denied,0",
                                                 "tool,allow,allow,1",
                                                 "tool,default,mcp-tool-not-allowed,0",
-                                                "tool,output,denied-text,1")
+                                                "tool,output,denied-text,1",
+                                                "listTools,allow,allow,1",
+                                                "listTools,default,mcp-discovery-not-allowed,0",
+                                                "listResources,allow,allow,1",
+                                                "listResources,default,mcp-discovery-not-allowed,0",
+                                                "listResourceTemplates,allow,allow,1",
+                                                "listResourceTemplates,default,mcp-discovery-not-allowed,0",
+                                                "listPrompts,allow,allow,1",
+                                                "listPrompts,default,mcp-discovery-not-allowed,0",
+                                                "instructions,allow,allow,0",
+                                                "instructions,default,mcp-discovery-not-allowed,0",
+                                                "instructions,output,denied-text,0",
+                                                "listTools,schema,denied-text,1",
+                                                "listPrompts,schema,denied-text,1",
+                                                "listResources,metadata,mcp-discovery-metadata-unsupported,1",
+                                                "listTools,limit,mcp-content-limit,1",
+                                                "listTools,cached,agent-tool-denied,1",
+                                                "tool,wire,mcp-response-limit,1")
                                         .stream()
                                         .map(
                                                 value -> {
@@ -69,8 +91,21 @@ class McpTransportIT {
             properties.setProperty(
                     "allow.mcp.prompts", McpOperations.prompt("inventory", "summarize"));
             properties.setProperty("allow.mcp.tools", "mcp:inventory/lookup");
+            properties.setProperty(
+                    "allow.mcp.discovery",
+                    Stream.of(
+                                    "listTools",
+                                    "listResources",
+                                    "listResourceTemplates",
+                                    "listPrompts",
+                                    "instructions")
+                            .map(method -> McpOperations.discovery("inventory", method))
+                            .collect(java.util.stream.Collectors.joining(",")));
         }
         properties.setProperty("deny.text", "secret-marker");
+        if (scenario.equals("wire")) {
+            properties.setProperty("mcp.max.response.bytes", "1024");
+        }
         properties.setProperty("detector.timeout.millis", "3000");
         Path config = directory.resolve("policy.properties");
         try (var writer = Files.newBufferedWriter(config)) {

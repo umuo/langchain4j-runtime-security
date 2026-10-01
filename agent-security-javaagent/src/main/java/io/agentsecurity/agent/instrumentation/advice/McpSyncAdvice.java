@@ -18,12 +18,13 @@ public final class McpSyncAdvice {
 
     @Advice.OnMethodExit
     public static void exit(
+            @Advice.This Object client,
             @Advice.Argument(0) Object request,
             @Advice.Enter String operation,
             @Advice.Return Object result,
             @Advice.Local("mcpContext") SecurityContext context) {
         try (var scope = SecurityContexts.restore(context)) {
-            McpBridge.after(request, operation, result);
+            McpBridge.after(client, request, operation, result);
         }
     }
 }

@@ -33,6 +33,19 @@ public final class McpOperations {
         return "mcp-prompt:" + name(server) + "/" + name(prompt);
     }
 
+    public static String discovery(String server, String method) {
+        if (!java.util.Set.of(
+                        "listTools",
+                        "listResources",
+                        "listResourceTemplates",
+                        "listPrompts",
+                        "instructions")
+                .contains(method)) {
+            throw new IllegalArgumentException("Invalid MCP discovery operation");
+        }
+        return "mcp-discovery:" + name(server) + "/" + method;
+    }
+
     private static String name(String value) {
         if (value == null || !value.matches("[a-zA-Z0-9_.-]{1,100}")) {
             throw new IllegalArgumentException("Invalid MCP name");

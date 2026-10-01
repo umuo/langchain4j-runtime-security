@@ -41,11 +41,13 @@ final class AgentBootstrap {
         }
         StreamLimits streamLimits = StreamLimits.from(properties);
         RagBridge.initialize(properties);
+        io.agentsecurity.agent.mcp.McpResponseLimits.initialize(properties);
         MemoryBridge.initialize(properties);
         Properties localProperties = new Properties();
         var streamKeys =
                 java.util.Set.of(
                         "telemetry.enabled",
+                        "mcp.max.response.bytes",
                         "stream.max.chars",
                         "stream.max.events",
                         "stream.max.active",

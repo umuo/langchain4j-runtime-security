@@ -65,6 +65,7 @@ public final class McpContentBridge {
     }
 
     public static void after(Object client, Boundary boundary, Object result) {
+        io.agentsecurity.agent.mcp.McpResponseLimits.check(client);
         boolean resource = boundary.uri() != null;
         shape(result, resource ? "McpReadResourceResult" : "McpGetPromptResult");
         StringBuilder content = new StringBuilder();

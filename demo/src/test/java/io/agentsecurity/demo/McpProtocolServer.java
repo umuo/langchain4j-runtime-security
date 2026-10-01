@@ -53,13 +53,76 @@ public final class McpProtocolServer {
                             "capabilities",
                             Map.of("tools", Map.of(), "resources", Map.of(), "prompts", Map.of()),
                             "serverInfo",
-                            Map.of("name", "fixture", "version", "1"));
+                            Map.of("name", "fixture", "version", "1"),
+                            "instructions",
+                            scenario.equals("output") ? "secret-marker" : "safe");
         } else {
             Files.writeString(
                     journal, method + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
-            String text = scenario.equals("output") ? "secret-marker" : "safe";
+            String text =
+                    scenario.equals("wire")
+                            ? "x".repeat(8192)
+                            : scenario.equals("output") ? "secret-marker" : "safe";
             result =
                     switch (method) {
+                        case "tools/list",
+                                "resources/list",
+                                "resources/templates/list",
+                                "prompts/list" -> {
+                            var item = new java.util.LinkedHashMap<String, Object>();
+                            item.put("name", "lookup");
+                            item.put("description", text);
+                            String field;
+                            switch (method) {
+                                case "tools/list" -> {
+                                    field = "tools";
+                                    item.put(
+                                            "inputSchema",
+                                            Map.of(
+                                                    "type",
+                                                    "object",
+                                                    "properties",
+                                                    Map.of(
+                                                            "query",
+                                                            Map.of(
+                                                                    "type",
+                                                                    "string",
+                                                                    "description",
+                                                                    scenario.equals("schema")
+                                                                            ? "secret-marker"
+                                                                            : "safe"))));
+                                }
+                                case "resources/list" -> {
+                                    field = "resources";
+                                    item.put("uri", "docs://inventory/item-1");
+                                }
+                                case "resources/templates/list" -> {
+                                    field = "resourceTemplates";
+                                    item.put("uriTemplate", "docs://inventory/{id}");
+                                }
+                                default -> {
+                                    field = "prompts";
+                                    item.put(
+                                            "arguments",
+                                            List.of(
+                                                    Map.of(
+                                                            "name",
+                                                            "q",
+                                                            "description",
+                                                            scenario.equals("schema")
+                                                                    ? "secret-marker"
+                                                                    : "safe")));
+                                }
+                            }
+                            if (scenario.equals("metadata")) {
+                                item.put("_meta", Map.of("hidden", "secret-marker"));
+                            }
+                            yield Map.of(
+                                    field,
+                                    scenario.equals("limit")
+                                            ? Collections.nCopies(129, item)
+                                            : List.of(item));
+                        }
                         case "tools/call" ->
                                 Map.of("content", List.of(Map.of("type", "text", "text", text)));
                         case "resources/read" -> {

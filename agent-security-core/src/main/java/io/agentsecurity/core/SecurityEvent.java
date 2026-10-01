@@ -53,6 +53,8 @@ public record SecurityEvent(
         MCP_RESOURCE_OUTPUT,
         MCP_PROMPT_INPUT,
         MCP_PROMPT_OUTPUT,
+        MCP_DISCOVERY_INPUT,
+        MCP_DISCOVERY_OUTPUT,
         RETRIEVAL_INPUT,
         RETRIEVAL_OUTPUT,
         AUGMENTATION_INPUT,

@@ -116,6 +116,6 @@ return Decision.allow();
 
 ## 6. 仍未覆盖
 
-listTools、listResources、listResourceTemplates、listPrompts、instructions、订阅、初始化、roots、子进程启动权限、直接调用底层 transport 均未纳入本轮策略拦截。构造客户端会初始化网络或进程，所以零业务请求不代表零连接。
+发现列表与 instructions 已在 [后续迭代](mcp-discovery-limits.md) 适配，并加入官方传输响应字节限制。订阅、初始化权限、roots、子进程启动权限和直接调用底层 transport 的策略授权仍未覆盖。构造客户端会初始化网络或进程，所以零业务请求不代表零连接。
 
-下一阶段应优先补 MCP 元数据/发现接口及原始响应容量限制，再增加认证、重连、超时的传输故障矩阵。已经返回输出拒绝时，服务端操作不会被回滚。
+发现与容量基础已补，下一阶段继续补分页预算、认证、重连和超时故障矩阵。已经返回输出拒绝时，服务端操作不会被回滚。

@@ -32,6 +32,19 @@ final class FailClosedTransformer implements ClassFileTransformer {
             Class<?> redefining,
             ProtectionDomain domain,
             byte[] bytes) {
+        // 与 AgentBuilder.ignore 保持一致，在读取类型描述前排除 JDK/SDK 自身，
+        // 避免不需要增强的基础类参与 Byte Buddy 的加载与解析。
+        if (name != null
+                && (name.startsWith("java/")
+                        || name.startsWith("jdk/")
+                        || name.startsWith("sun/")
+                        || name.startsWith("net/bytebuddy/")
+                        || name.startsWith("io/agentsecurity/agent/")
+                        || name.startsWith("io/agentsecurity/core/")
+                        || name.startsWith("io/agentsecurity/policy/")
+                        || name.startsWith("io/agentsecurity/shaded/"))) {
+            return null;
+        }
         Boolean parent = failed.get();
         failed.remove();
         try {
@@ -48,7 +61,11 @@ final class FailClosedTransformer implements ClassFileTransformer {
                 | RuntimeException
                 | LinkageError error) {
             failureSignal.run();
-            System.err.println("[agent-security] TRANSFORM_ERROR class-definition-rejected");
+            System.err.println(
+                    "[agent-security] TRANSFORM_ERROR class-definition-rejected type="
+                            + name
+                            + " error="
+                            + error.getClass().getName());
             return new byte[0];
         } finally {
             if (parent == null) {

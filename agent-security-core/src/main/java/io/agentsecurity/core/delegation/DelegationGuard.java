@@ -28,7 +28,9 @@ public final class DelegationGuard {
                             MCP_RESOURCE_INPUT,
                             MCP_RESOURCE_OUTPUT,
                             MCP_PROMPT_INPUT,
-                            MCP_PROMPT_OUTPUT ->
+                            MCP_PROMPT_OUTPUT,
+                            MCP_DISCOVERY_INPUT,
+                            MCP_DISCOVERY_OUTPUT ->
                     grant.tools().contains(event.operation())
                             ? Decision.allow()
                             : Decision.deny("agent-tool-denied");

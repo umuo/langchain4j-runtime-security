@@ -11,8 +11,13 @@ import io.agentsecurity.agent.instrumentation.advice.ExecutorArgumentAdvice;
 import io.agentsecurity.agent.instrumentation.advice.ExecutorReturnAdvice;
 import io.agentsecurity.agent.instrumentation.advice.ExecutorServiceReturnAdvice;
 import io.agentsecurity.agent.instrumentation.advice.FutureAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpClientBindAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpContentAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpDiscoveryAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpFutureAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpHttpLimitAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpStdioInputAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpStdioStartAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpSyncAdvice;
 import io.agentsecurity.agent.instrumentation.advice.MemoryDispatchAdvice;
 import io.agentsecurity.agent.instrumentation.advice.MemoryFutureAdvice;
@@ -125,6 +130,17 @@ public final class AgentInstrumentation {
                         .and(not(isAbstract()))
                         .and(not(isNative()))
                         .and(not(isStatic()));
+        var mcpDiscoveryMethods =
+                namedOneOf(
+                                "listTools",
+                                "listResources",
+                                "listResourceTemplates",
+                                "listPrompts",
+                                "instructions")
+                        .and(isPublic())
+                        .and(not(isAbstract()))
+                        .and(not(isStatic()))
+                        .and(not(isNative()));
         ThreadLocal<Boolean> failedTransform = new ThreadLocal<>();
         var transformer =
                 new AgentBuilder.Default()
@@ -353,6 +369,17 @@ public final class AgentInstrumentation {
                         .transform(
                                 (builder, type, loader, module, domain) ->
                                         builder.visit(
+                                                        Advice.to(McpDiscoveryAdvice.class)
+                                                                .on(mcpDiscoveryMethods))
+                                                .visit(
+                                                        Advice.to(McpClientBindAdvice.class)
+                                                                .on(
+                                                                        isConstructor()
+                                                                                .and(
+                                                                                        isDeclaredBy(
+                                                                                                named(
+                                                                                                        "dev.langchain4j.mcp.client.DefaultMcpClient")))))
+                                                .visit(
                                                         Advice.to(McpContentAdvice.class)
                                                                 .on(mcpContentMethods))
                                                 .visit(
@@ -370,6 +397,26 @@ public final class AgentInstrumentation {
                                                                                 returns(
                                                                                         CompletableFuture
                                                                                                 .class)))))
+                        .type(
+                                named(
+                                        "dev.langchain4j.mcp.client.transport.http.StreamableHttpMcpTransport"))
+                        .transform(
+                                (builder, type, loader, module, domain) ->
+                                        builder.visit(
+                                                Advice.to(McpHttpLimitAdvice.class)
+                                                        .on(isConstructor())))
+                        .type(named("dev.langchain4j.mcp.client.transport.stdio.StdioMcpTransport"))
+                        .transform(
+                                (builder, type, loader, module, domain) ->
+                                        builder.visit(
+                                                Advice.to(McpStdioStartAdvice.class)
+                                                        .on(named("start"))))
+                        .type(named("dev.langchain4j.mcp.transport.stdio.JsonRpcIoHandler"))
+                        .transform(
+                                (builder, type, loader, module, domain) ->
+                                        builder.visit(
+                                                Advice.to(McpStdioInputAdvice.class)
+                                                        .on(isConstructor())))
                         .makeRaw();
         instrumentation.addTransformer(
                 new FailClosedTransformer(transformer, failedTransform), false);

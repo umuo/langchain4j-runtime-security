@@ -19,6 +19,7 @@ public final class LocalPolicy implements Detector {
     private final Set<String> allowedMcpTools;
     private final Set<String> allowedMcpResources;
     private final Set<String> allowedMcpPrompts;
+    private final Set<String> allowedMcpDiscovery;
 
     private final java.util.Map<SecurityEvent.Phase, String> memoryPermissions;
 
@@ -37,6 +38,7 @@ public final class LocalPolicy implements Detector {
                         "allow.mcp.tools",
                         "allow.mcp.resources",
                         "allow.mcp.prompts",
+                        "allow.mcp.discovery",
                         "allow.retrievers",
                         "deny.text",
                         "max.text.chars",
@@ -78,6 +80,11 @@ public final class LocalPolicy implements Detector {
                         properties,
                         "allow.mcp.prompts",
                         "mcp-prompt:[a-zA-Z0-9_.-]{1,100}/[a-zA-Z0-9_.-]{1,100}");
+        allowedMcpDiscovery =
+                mcpNames(
+                        properties,
+                        "allow.mcp.discovery",
+                        "mcp-discovery:[a-zA-Z0-9_.-]{1,100}/(listTools|listResources|listResourceTemplates|listPrompts|instructions)");
         var permissions =
                 new java.util.EnumMap<SecurityEvent.Phase, String>(SecurityEvent.Phase.class);
         for (var entry :
@@ -143,6 +150,11 @@ public final class LocalPolicy implements Detector {
                         || event.phase() == SecurityEvent.Phase.MCP_PROMPT_OUTPUT)
                 && !allowedMcpPrompts.contains(event.operation())) {
             return Decision.deny("mcp-prompt-not-allowed");
+        }
+        if ((event.phase() == SecurityEvent.Phase.MCP_DISCOVERY_INPUT
+                        || event.phase() == SecurityEvent.Phase.MCP_DISCOVERY_OUTPUT)
+                && !allowedMcpDiscovery.contains(event.operation())) {
+            return Decision.deny("mcp-discovery-not-allowed");
         }
         String permission = memoryPermissions.get(event.phase());
         if (permission != null) {
