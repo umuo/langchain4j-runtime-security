@@ -1,0 +1,23 @@
+package io.agentsecurity.agent.instrumentation.advice;
+
+import io.agentsecurity.agent.bridge.McpContentBridge;
+import net.bytebuddy.asm.Advice;
+
+/** 同步资源读取和提示词渲染边界；先授权，后检查整批返回内容。 */
+public final class McpContentAdvice {
+    @Advice.OnMethodEnter
+    public static McpContentBridge.Boundary enter(
+            @Advice.This Object client,
+            @Advice.Origin("#m") String method,
+            @Advice.AllArguments Object[] arguments) {
+        return McpContentBridge.before(client, method, arguments);
+    }
+
+    @Advice.OnMethodExit
+    public static void exit(
+            @Advice.This Object client,
+            @Advice.Enter McpContentBridge.Boundary boundary,
+            @Advice.Return Object result) {
+        McpContentBridge.after(client, boundary, result);
+    }
+}

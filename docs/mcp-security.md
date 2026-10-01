@@ -6,7 +6,7 @@
 
 固定组合为 LangChain4j core `1.20.0`、MCP `1.20.0-beta30`。入口增强同时匹配 McpClient 接口及其实现类，验收使用官方 DefaultMcpClient；自定义实现、不同版本、隐藏类、其他 ClassLoader 场景需要独立验收。客户端所在 ClassLoader 必须能读取这两个库的 pom.properties；版本不匹配拒绝调用。
 
-本轮只支持工具边界，不保护 listTools、instructions、资源读取、提示词、订阅、初始化、子进程启动和任意直接传输调用。构造 DefaultMcpClient 可能已经连接网络或启动进程，所以“拒绝时零工具请求”不表示“零网络访问”。
+本文说明工具边界；资源读取和提示词已在后续迭代适配，见 [资源与提示词安全](mcp-content-security.md)。仍不保护 listTools、instructions、订阅、初始化、子进程启动和任意直接传输调用。构造 DefaultMcpClient 可能已经连接网络或启动进程，所以“拒绝时零工具请求”不表示“零网络访问”。
 
 客户端内部监听器、日志、结果转换器在返回检查前可能看到原始响应；这些组件必须来自可信宿主。异常携带的响应内容没有单独输出净化。不要将异常消息、监听器参数直接交给模型。SDK 不是同 JVM 恶意代码沙箱。
 
@@ -118,7 +118,7 @@ sequenceDiagram
 - 非法名称、错误 MCP 版本元数据零调用；带隐藏元数据结果拒绝。
 - 委托 Agent 在异步返回前结束：恢复原身份并拒绝交付。
 
-这是客户端边界验收，不是实际 HTTP/SSE/stdio、MCP 服务器认证、协议重试、恶意服务器压力测试或生产环境证明。
+上述是最初的内存传输边界验收。后续增加了 [真实 HTTP/SSE/stdio 验收](mcp-content-security.md)，仍不证明 MCP 服务器认证、协议重试、恶意服务器压力测试或生产 SLA。
 
 签名核对来自 [官方 MCP 1.20.0-beta30 源码包](https://repo.maven.apache.org/maven2/dev/langchain4j/langchain4j-mcp/1.20.0-beta30/langchain4j-mcp-1.20.0-beta30-sources.jar)，不可直接用 main 分支 API 推断当前版本。
 

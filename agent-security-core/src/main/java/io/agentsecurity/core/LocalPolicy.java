@@ -17,6 +17,8 @@ public final class LocalPolicy implements Detector {
     private final Set<String> allowedRetrievers;
 
     private final Set<String> allowedMcpTools;
+    private final Set<String> allowedMcpResources;
+    private final Set<String> allowedMcpPrompts;
 
     private final java.util.Map<SecurityEvent.Phase, String> memoryPermissions;
 
@@ -33,6 +35,8 @@ public final class LocalPolicy implements Detector {
                         "deny.tools",
                         "allow.tools",
                         "allow.mcp.tools",
+                        "allow.mcp.resources",
+                        "allow.mcp.prompts",
                         "allow.retrievers",
                         "deny.text",
                         "max.text.chars",
@@ -64,6 +68,16 @@ public final class LocalPolicy implements Detector {
                         name -> !name.matches("mcp:[a-zA-Z0-9_.-]{1,100}/[a-zA-Z0-9_.-]{1,100}"))) {
             throw new IllegalArgumentException("Invalid allow.mcp.tools");
         }
+        allowedMcpResources =
+                mcpNames(
+                        properties,
+                        "allow.mcp.resources",
+                        "mcp-resource:[a-zA-Z0-9_.-]{1,100}/[a-f0-9]{64}");
+        allowedMcpPrompts =
+                mcpNames(
+                        properties,
+                        "allow.mcp.prompts",
+                        "mcp-prompt:[a-zA-Z0-9_.-]{1,100}/[a-zA-Z0-9_.-]{1,100}");
         var permissions =
                 new java.util.EnumMap<SecurityEvent.Phase, String>(SecurityEvent.Phase.class);
         for (var entry :
@@ -94,6 +108,14 @@ public final class LocalPolicy implements Detector {
         }
     }
 
+    private static Set<String> mcpNames(Properties properties, String key, String pattern) {
+        var names = Set.copyOf(split(properties.getProperty(key, "")));
+        if (names.stream().anyMatch(name -> !name.matches(pattern))) {
+            throw new IllegalArgumentException("Invalid " + key);
+        }
+        return names;
+    }
+
     private static List<String> split(String value) {
         return Arrays.stream(value.split(","))
                 .map(String::trim)
@@ -111,6 +133,16 @@ public final class LocalPolicy implements Detector {
                         || event.phase() == SecurityEvent.Phase.MCP_TOOL_OUTPUT)
                 && !allowedMcpTools.contains(event.operation())) {
             return Decision.deny("mcp-tool-not-allowed");
+        }
+        if ((event.phase() == SecurityEvent.Phase.MCP_RESOURCE_INPUT
+                        || event.phase() == SecurityEvent.Phase.MCP_RESOURCE_OUTPUT)
+                && !allowedMcpResources.contains(event.operation())) {
+            return Decision.deny("mcp-resource-not-allowed");
+        }
+        if ((event.phase() == SecurityEvent.Phase.MCP_PROMPT_INPUT
+                        || event.phase() == SecurityEvent.Phase.MCP_PROMPT_OUTPUT)
+                && !allowedMcpPrompts.contains(event.operation())) {
+            return Decision.deny("mcp-prompt-not-allowed");
         }
         String permission = memoryPermissions.get(event.phase());
         if (permission != null) {

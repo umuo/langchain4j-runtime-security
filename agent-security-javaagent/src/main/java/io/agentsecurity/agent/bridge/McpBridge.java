@@ -35,6 +35,12 @@ public final class McpBridge {
 
     private McpBridge() {}
 
+    static String server(Object client) {
+        Bridge.verifyBoundary(client);
+        VERSIONS.get(client.getClass());
+        return name(Bridge.call(client, "key"));
+    }
+
     public static String before(Object client, Object request) {
         Bridge.verifyBoundary(request);
         VERSIONS.get(client.getClass());

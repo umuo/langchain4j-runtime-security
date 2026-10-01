@@ -445,3 +445,7 @@ Spring 应用可以用已注入业务服务的 Detector Bean 来构造这个手�
 ## MCP 专属策略扩展
 
 新增 `MCP_TOOL_INPUT`、`MCP_TOOL_OUTPUT` 阶段，operation 使用 `mcp:客户端key/物理工具名`。Detector SPI、ToolPolicy 参数规则与委托 AgentGrant 可以使用此名称；必须同步配置 `allow.mcp.tools`。完整示例、调用顺序与未覆盖范围见 [MCP 工具边界](mcp-security.md)。
+
+### MCP 资源与提示词
+
+使用 `McpOperations.resource(server, uri)` / `prompt(server, name)` 生成精确授权名，同时用于本地允许列表与 AgentGrant.tools。新增四个资源/提示词输入输出阶段，资源事件带原始 ResourceRef；配置示例、Detector 扩展点和真实传输验收见 [资源与提示词安全](mcp-content-security.md)。

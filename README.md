@@ -72,7 +72,7 @@ java -javaagent:/absolute/path/agent-security-javaagent.jar=/absolute/path/polic
 | 回调式 `StreamingChatModel` | 输入检查；正文、thinking、工具回调缓冲到最终校验通过后释放；跨 chunk 检查；输出拒绝通过 `onError` 交付（输入拒绝可同步抛出） |
 | Reactive `Flow.Publisher` 模型入口 | 已实现固定 1.20.0 的模型事件流；每次订阅检查输入，输出完整校验后按 demand 交付；支持取消、并发 request 和超时 |
 | RAG | 已实现 ContentRetriever／RetrievalAugmentor 同步与 future 前后检查；具名直接调用及指定框架入口的 lambda 分发；查询、结果正文／文档元数据检查；不自动落实数据源 ACL，详见 [边界](docs/rag-security.md) |
-| MCP | 固定版本同步/异步工具边界、服务与工具组合授权；详见 [MCP 安全](docs/mcp-security.md)，其他 MCP 操作未覆盖 |
+| MCP | 固定版本工具、资源、提示词边界与精确授权；[MCP 工具](docs/mcp-security.md)、[资源/提示词与传输验收](docs/mcp-content-security.md)；发现和订阅未覆盖 |
 | ChatMemory / ChatMemoryStore | 读前授权／读后消息检查、批量写入前检查、删除前授权，同步／future 和指定框架分发入口；逐会话 ACL 需应用 SPI，详见 [接入](docs/memory-security.md) |
 | Embedding、工具描述、多模态 | 未实现专用防护；用户／工具非文本内容显式拒绝；不提供图像／音频检测 |
 | 直接调用业务工具方法、绕过 LangChain4j 的 HTTP / SQL / 文件操作 | 不覆盖 |
@@ -218,7 +218,7 @@ audit.queue.capacity=128
 
 没有外部模型推理效果或性能数据；官方客户端连接本机端点的测试证明指定边界的工程行为，不证明提示注入检测准确率。
 
-已补远程检测客户端与运行健康指标；已提供 [策略原子发布与回滚](docs/policy-versioning.md)；已补 [MCP 工具边界](docs/mcp-security.md)；后续推进资源/提示词适配、事件去重、性能和发布验收。RAG 与 memory 的接入及未覆盖路径见 [RAG](docs/rag-security.md) 和 [ChatMemory](docs/memory-security.md)。当前仍不能标记为完整生产可用。
+已补远程检测客户端与运行健康指标；已提供 [策略原子发布与回滚](docs/policy-versioning.md)；已补 [MCP 工具边界](docs/mcp-security.md)；已补 [资源/提示词及真实传输验收](docs/mcp-content-security.md)；后续推进发现接口、容量限制、事件去重和发布验收。RAG 与 memory 的接入及未覆盖路径见 [RAG](docs/rag-security.md) 和 [ChatMemory](docs/memory-security.md)。当前仍不能标记为完整生产可用。
 
 ## 流式安全模式
 

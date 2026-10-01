@@ -11,6 +11,7 @@ import io.agentsecurity.agent.instrumentation.advice.ExecutorArgumentAdvice;
 import io.agentsecurity.agent.instrumentation.advice.ExecutorReturnAdvice;
 import io.agentsecurity.agent.instrumentation.advice.ExecutorServiceReturnAdvice;
 import io.agentsecurity.agent.instrumentation.advice.FutureAdvice;
+import io.agentsecurity.agent.instrumentation.advice.McpContentAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpFutureAdvice;
 import io.agentsecurity.agent.instrumentation.advice.McpSyncAdvice;
 import io.agentsecurity.agent.instrumentation.advice.MemoryDispatchAdvice;
@@ -113,6 +114,17 @@ public final class AgentInstrumentation {
                         .and(not(isAbstract()))
                         .and(not(isStatic()))
                         .and(not(isNative()));
+        var mcpContentMethods =
+                named("readResource")
+                        .and(takesArgument(0, String.class))
+                        .and(takesArguments(1).or(takesArguments(2)))
+                        .or(
+                                named("getPrompt")
+                                        .and(takesArguments(String.class, java.util.Map.class)))
+                        .and(isPublic())
+                        .and(not(isAbstract()))
+                        .and(not(isNative()))
+                        .and(not(isStatic()));
         ThreadLocal<Boolean> failedTransform = new ThreadLocal<>();
         var transformer =
                 new AgentBuilder.Default()
@@ -341,6 +353,9 @@ public final class AgentInstrumentation {
                         .transform(
                                 (builder, type, loader, module, domain) ->
                                         builder.visit(
+                                                        Advice.to(McpContentAdvice.class)
+                                                                .on(mcpContentMethods))
+                                                .visit(
                                                         Advice.to(McpSyncAdvice.class)
                                                                 .on(
                                                                         mcpMethods.and(
