@@ -32,16 +32,28 @@ import io.agentsecurity.agent.instrumentation.advice.RagSyncAdvice;
 import io.agentsecurity.agent.instrumentation.advice.ReactiveAdvice;
 import io.agentsecurity.agent.instrumentation.advice.StreamInputAdvice;
 import io.agentsecurity.agent.instrumentation.advice.SyncAdvice;
+import io.agentsecurity.agent.mcp.McpPagination;
 import java.lang.instrument.Instrumentation;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import net.bytebuddy.agent.builder.AgentBuilder;
 import net.bytebuddy.asm.Advice;
+import net.bytebuddy.asm.MemberSubstitution;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.utility.JavaModule;
 
 /** 集中注册固定 LangChain4j 版本的增强规则；实际拦截逻辑由独立 Advice 实现。 */
 public final class AgentInstrumentation {
+
+    private static java.lang.reflect.Method paginationAwait() {
+        try {
+            return McpPagination.class.getMethod(
+                    "await", CompletableFuture.class, long.class, TimeUnit.class);
+        } catch (NoSuchMethodException failure) {
+            throw new IllegalStateException("Missing MCP pagination await bridge", failure);
+        }
+    }
 
     public static void install(Instrumentation instrumentation) {
         var modelType =
@@ -371,6 +383,30 @@ public final class AgentInstrumentation {
                                 (builder, type, loader, module, domain) ->
                                         builder.visit(
                                                         Advice.to(McpPaginationAdvice.class)
+                                                                .on(
+                                                                        named("fetchPaginatedList")
+                                                                                .and(
+                                                                                        takesArguments(
+                                                                                                4))
+                                                                                .and(
+                                                                                        isDeclaredBy(
+                                                                                                named(
+                                                                                                        "dev.langchain4j.mcp.client.DefaultMcpClient")))))
+                                                .visit(
+                                                        MemberSubstitution.strict()
+                                                                .method(
+                                                                        named("get")
+                                                                                .and(
+                                                                                        isDeclaredBy(
+                                                                                                CompletableFuture
+                                                                                                        .class))
+                                                                                .and(
+                                                                                        takesArguments(
+                                                                                                long
+                                                                                                        .class,
+                                                                                                TimeUnit
+                                                                                                        .class)))
+                                                                .replaceWith(paginationAwait())
                                                                 .on(
                                                                         named("fetchPaginatedList")
                                                                                 .and(

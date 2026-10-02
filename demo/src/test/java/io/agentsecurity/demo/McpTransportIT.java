@@ -66,6 +66,10 @@ class McpTransportIT {
                                                 "listTools,cached,agent-tool-denied,1",
                                                 "tool,wire,mcp-response-limit,1",
                                                 "listTools,paged-ok,allow,2",
+                                                "listTools,paged-timeout,mcp-pagination-timeout,2",
+                                                "listResources,paged-timeout,mcp-pagination-timeout,2",
+                                                "listResourceTemplates,paged-timeout,mcp-pagination-timeout,2",
+                                                "listPrompts,paged-timeout,mcp-pagination-timeout,2",
                                                 "listResources,paged-ok,allow,2",
                                                 "listResourceTemplates,paged-ok,allow,2",
                                                 "listPrompts,paged-ok,allow,2",
@@ -124,6 +128,9 @@ class McpTransportIT {
         }
         if (scenario.equals("paged-bytes")) {
             properties.setProperty("mcp.pagination.max.json.bytes", "1024");
+        }
+        if (scenario.equals("paged-timeout")) {
+            properties.setProperty("mcp.pagination.timeout.ms", "1200");
         }
         properties.setProperty("detector.timeout.millis", "3000");
         Path config = directory.resolve("policy.properties");

@@ -13,7 +13,8 @@ public final class McpDiagnostics {
         PAGINATION_PAGES,
         PAGINATION_ITEMS,
         PAGINATION_BYTES,
-        PAGINATION_CURSOR
+        PAGINATION_CURSOR,
+        PAGINATION_TIMEOUT
     }
 
     public record Snapshot(

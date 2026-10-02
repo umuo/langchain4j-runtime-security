@@ -12,6 +12,8 @@ mcp.max.response.bytes=1048576
 mcp.pagination.max.pages=16
 mcp.pagination.max.items=128
 mcp.pagination.max.json.bytes=1048576
+# 整次实际分页查询的单调时钟预算，单位毫秒
+mcp.pagination.timeout.ms=30000
 ```
 
 | 配置 | 默认 | 合法范围 | 执行时机 |
@@ -19,8 +21,11 @@ mcp.pagination.max.json.bytes=1048576
 | max.pages | 16 | 1～256 | 创建下一页请求前，达到上限则不发出该请求 |
 | max.items | 128 | 1～128 | 页面解析后、加入总列表前 |
 | max.json.bytes | 1048576 | 1～16777216 | 调用类型化页面解析器前 |
+| timeout.ms | 30000 | 1～300000 | 每页等待、请求/结果检查与分页方法出口 |
 
-表中后三项均带 `mcp.pagination.` 前缀。它们是 Java Agent 启动配置，不是 LocalPolicy/PolicyCompiler 属性，不随策略版本热更新。条目数上限不能超过已有发现结果的 128 项上限。
+表中四项均带 `mcp.pagination.` 前缀。它们是 Java Agent 启动配置，不是 LocalPolicy/PolicyCompiler 属性，不随策略版本热更新。条目数上限不能超过已有发现结果的 128 项上限。
+
+升级后即使不增加配置，也会启用默认 30 秒总预算；过去依靠逐页重置超时而运行超过 30 秒的目录查询可能被拒绝。上线前按目录规模验证预算，可在 1～300000ms 内显式设置；不能用 0 关闭总时间限制。
 
 保护 listTools、listResources、listResourceTemplates、listPrompts。instructions 不分页。每次框架实际调用内部 fetchPaginatedList 时创建独立预算；缓存命中不创建预算，但发现入口仍重新鉴权。
 
@@ -36,11 +41,18 @@ mcp.pagination.max.json.bytes=1048576
 | mcp-pagination-items | 当前页会使累计条目超限 |
 | mcp-pagination-bytes | 当前 JSON 会使累计字节超限 |
 | mcp-pagination-cursor | 重复、空或过长游标 |
+| mcp-pagination-timeout | 整次分页查询时间预算耗尽 |
 | mcp-pagination-shape | 页面结构、反射访问或 JSON 字符形状无法安全适配 |
 
 条目/游标超限时当前页已由客户端解析，但不会加入总列表；已经接受的前几页也不会作为部分成功结果返回。正常成功的列表仍经过发现出口的内容检测。新的查询拥有新预算，分页超限不把客户端标记为永久不可用。传输原始响应超限仍遵循上一轮的粘滞故障语义，需重建传输和客户端。
 
-本轮没有新增整个查询的墙钟总超时。原有框架每页超时仍生效，宿主需设置有限的 toolExecutionTimeout、resourcesTimeout、promptsTimeout。单页解析器的对象分配/CPU、第三方监听器、原始日志和远程进程资源仍不受这三个累计预算完整约束。
+总时间从实际分页方法入口开始，用 `System.nanoTime()` 测量，不受系统时间调整影响。每页的 Future 等待使用 `min(框架单页超时, 整次查询剩余时间)`，后续页不会重置总预算。请求创建前、页面接受前与正常返回出口也检查期限；过期结果不会交给调用方。原框架单页超时更短时仍保留其原有异常，不误报总预算超时。缓存命中、初始化握手、发现入口鉴权和分页之后的内容检测不在此时间窗口内。
+
+等待超时仍交给固定客户端原来的 TimeoutException 分支，取消原 Future、移除 pendingOperations，并按已协商协议发送取消通知。Agent 在分页方法出口将总预算超时映射为 `SecurityBlockedException("mcp-pagination-timeout")`；不返回已接受的部分结果，也不使传输永久失效。线程作用域只用于关联这个固定分页方法内的等待调用，支持嵌套，所有正常/异常出口恢复外层状态。
+
+显式关闭官方 HTTP 传输时，JDK 21 上先对其独占 HTTP 客户端调用 shutdownNow，再调用 close，终止包括尚未返回响应头的在途请求。只遍历已注册 SSE subscriber 无法涵盖这些请求，超时后立即关闭可能卡在 JDK 的等待终止阶段。这里改变的是显式关闭语义，不是在每次分页超时时关闭共享传输；JDK 17 没有这两个生命周期 API，本轮运行验收基于 JDK 21。
+
+这不是强制抢占的硬实时上限：同步请求监听器/发送调用、解析器、协议取消发送或 JVM 调度停顿仍可能使方法实际返回晚于期限。超时不能保证服务端停止执行；应保留宿主的有限单页/传输超时及服务器资源限制。对象分配/CPU、第三方监听器、原始日志和远程进程资源也不受这些预算完整约束。
 
 分页页对象是固定版本的包内 record，适配器使用受限反射访问这两个已知 accessor。无法访问时拒绝，不通过关闭检查兼容。JPMS 强封装、自定义客户端/传输和其他 LangChain4j 版本未验收。
 
@@ -78,7 +90,7 @@ String metrics = PrometheusMetrics.renderMcp(snapshot);
 
 每项均为进程生命周期 counter，重启归零。接受页数/条目数不是安全策略 ALLOW 数；前页接受后整次查询仍可能失败。
 
-reason 只有以下六项：
+reason 只有以下七项：
 
 - HTTP_RESPONSE_BYTES
 - STDIO_LINE_BYTES
@@ -86,8 +98,9 @@ reason 只有以下六项：
 - PAGINATION_ITEMS
 - PAGINATION_BYTES
 - PAGINATION_CURSOR
+- PAGINATION_TIMEOUT
 
-同一传输只有首次容量超限增加对应原因计数；后续检查单独计入 failed_state_checks。一次分页查询在首次容量拒绝时计一次原因；重试查询是新的查询，可能再次计数。mcp-pagination-shape 属于非容量失败，会增加 pagination_failed，但不伪装成上述容量原因。
+同一传输只有首次容量超限增加对应原因计数；后续检查单独计入 failed_state_checks。一次分页查询在首次容量或总时间预算拒绝时计一次原因；重试查询是新的查询，可能再次计数。mcp-pagination-shape 属于非容量失败，会增加 pagination_failed，但不伪装成上述容量原因。
 
 例如可观察最近 5 分钟新增的分页超限：
 
@@ -105,6 +118,8 @@ McpTransportIT 在真实本机 HTTP JSON、POST 响应 SSE、stdio 中加入：�
 
 同时核对诊断快照与服务端请求日志。页数超限重试场景每次最多两页，两次调用共四个业务请求，pagination_failed 与 PAGINATION_PAGES 均为 2，transport_failures 为 0。响应字节超限仍只记一次传输故障，随后调用在入口拒绝，服务端不会收到第二个工具请求。
 
+新增总超时场景覆盖四种目录 × 三种传输：每页延迟 800ms、单页超时 2s、总预算 1200ms，第二页等待提前终止，返回 mcp-pagination-timeout；检查失败计数、请求数和总耗时。单元测试用可控单调时钟验证精确期限、时钟回绕、剩余等待预算、较短单页超时与嵌套作用域恢复。
+
 单元测试覆盖 UTF-8 多字节/代理对精确边界、拒绝页不计入 accepted、结束计数不重复、并发诊断计数、不可变快照和 Prometheus 固定标签。完整执行命令仍为 `bash scripts/release.sh`。
 
-后续方向：整次分页查询的总截止时间、异常结果的统一结构化诊断、MCP 认证/重连故障矩阵。上一轮偶发冷启动错误的根因仍未完全确认，保留 20 次冷启动回归与诊断，不把本轮通过当作根因已消除的证明。
+后续方向：异常结果的统一结构化诊断、MCP 认证/重连故障矩阵。上一轮偶发冷启动错误的根因仍未完全确认，保留 20 次冷启动回归与诊断，不把本轮通过当作根因已消除的证明。

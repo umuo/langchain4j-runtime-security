@@ -97,9 +97,12 @@ public final class LimitedMcpHttpClient extends HttpClient {
         return info -> new LimitedSubscriber<>(handler.apply(info), state);
     }
 
-    /** 保持 JDK 17 源码兼容，同时将 JDK 21 的关闭调用转交给真正的客户端。 */
+    /** 保持 JDK 17 源码兼容；关闭传输时先终止仍在等待响应头的请求，再关闭客户端。 */
     public void close() {
         try {
+            // 超时后的 SSE 响应可能尚未注册 subscriber；仅取消已有 subscriber 会漏掉它。
+            // 此客户端由 MCP 传输独占，显式关闭意味着不再保留任何在途请求。
+            HttpClient.class.getMethod("shutdownNow").invoke(delegate);
             HttpClient.class.getMethod("close").invoke(delegate);
         } catch (NoSuchMethodException ignored) {
             // JDK 17 没有显式关闭方法。

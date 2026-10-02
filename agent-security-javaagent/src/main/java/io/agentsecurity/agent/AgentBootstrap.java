@@ -50,6 +50,7 @@ final class AgentBootstrap {
                         "telemetry.enabled",
                         "mcp.max.response.bytes",
                         "mcp.pagination.max.pages",
+                        "mcp.pagination.timeout.ms",
                         "mcp.pagination.max.items",
                         "mcp.pagination.max.json.bytes",
                         "stream.max.chars",

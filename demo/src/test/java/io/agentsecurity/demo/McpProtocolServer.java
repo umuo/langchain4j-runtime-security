@@ -59,6 +59,9 @@ public final class McpProtocolServer {
         } else {
             Files.writeString(
                     journal, method + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            if (scenario.equals("paged-timeout")) {
+                Thread.sleep(800);
+            }
             String text =
                     scenario.equals("wire")
                             ? "x".repeat(8192)

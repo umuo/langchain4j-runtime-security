@@ -133,6 +133,7 @@ public final class McpTransportApplication {
                 client.listTools();
             }
             String rule = "allow";
+            long queryStarted = System.nanoTime();
             try {
                 if (scenario.equals("delegation") || scenario.equals("cached")) {
                     var grant = AgentGrant.tools(Set.of(), Set.of("lookup"));
@@ -166,6 +167,13 @@ public final class McpTransportApplication {
                     throw new AssertionError("Unexpected transport failure", failure);
                 }
                 rule = denied.ruleId();
+            }
+            if (scenario.equals("paged-timeout")) {
+                long elapsedMillis = (System.nanoTime() - queryStarted) / 1_000_000;
+                if (elapsedMillis < 1000 || elapsedMillis > 1550) {
+                    throw new AssertionError(
+                            "Unexpected total deadline duration: " + elapsedMillis);
+                }
             }
             if (scenario.equals("wire")) {
                 try {

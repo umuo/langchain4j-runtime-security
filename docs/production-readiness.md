@@ -139,3 +139,11 @@ policy 模块新增 RemoteHttpDetector，提供固定可信端点、显式内容
 为固定版本的实际分页循环加入请求页数、累计条目和累计 JSON UTF-8 字节预算，拒绝重复/过长游标；新增无业务标识的固定维度诊断快照和 Prometheus 文本输出。分页超限不使传输永久失效，总截止时间仍待实现。配置与限制见 [分页与指标](mcp-pagination-metrics.md)。
 
 2026-10-02，完整 `scripts/release.sh` 通过 **558 项测试，零失败、零错误、零跳过**（core 71、policy 87、telemetry 17、Agent 72、普通 Java 223、Boot 88）。新增 30 项真实传输分页场景及 9 项单元测试；147 项 HTTP/SSE/stdio 矩阵与 20 项冷启动回归全部通过。4 个运行时 JAR 隔离重建 SHA-256 一致，发布包包含 SBOM、测试报告和校验和。验证环境为 macOS arm64 / JDK 21.0.4；这些结果不扩展为其他 MCP 版本、外部服务端或远端 CI 的验收结论。
+
+## MCP 分页总时间预算迭代
+
+新增 `mcp.pagination.timeout.ms`（默认 30000ms，范围 1～300000ms）。每页等待使用整次查询剩余预算和原单页超时的较小值；沿用客户端取消/清理分支，总期限耗尽返回 `mcp-pagination-timeout` 并增加固定维度 `PAGINATION_TIMEOUT` 指标。未增加线程池或调度器。同步监听器、发送/解析/取消处理无法被强制抢占，不承诺方法返回的硬实时上限。具体边界见 [分页与指标](mcp-pagination-metrics.md)。
+
+首次真实传输矩阵中，4 个 SSE 超时场景返回了预期拒绝，但子进程在关闭阶段挂起；独立复现的线程栈确认阻塞在 JDK HTTP 客户端 close/awaitTermination。现已在显式关闭独占 HTTP 客户端时先执行 shutdownNow，覆盖尚未注册 SSE subscriber 的在途请求，保留同一批测试验证退出行为。
+
+2026-10-02，最终完整 `scripts/release.sh` 通过 **576 项测试，零失败、零错误、零跳过**（core 71、policy 87、telemetry 17、Agent 78、普通 Java 235、Boot 88）。本轮新增 6 项分页时间边界单测及 12 项真实传输总超时场景；159 项 HTTP/SSE/stdio 矩阵与 20 项冷启动回归全部通过，包括此前挂起的 SSE 关闭场景。4 个运行时 JAR 隔离重建 SHA-256 一致，发布包包含 SBOM、测试报告和校验和。验证环境为 macOS arm64 / JDK 21.0.4，不代表其他 JDK、外部服务端或远端 CI 已验收。

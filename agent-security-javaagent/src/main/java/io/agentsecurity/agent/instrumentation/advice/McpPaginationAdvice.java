@@ -12,6 +12,7 @@ public final class McpPaginationAdvice {
             @Advice.Argument(value = 0, readOnly = false) BiFunction<Long, String, Object> requests,
             @Advice.Argument(value = 3, readOnly = false) Function<String, Object> parser) {
         var budget = McpPagination.begin();
+        McpPagination.enter(budget);
         requests = McpPagination.requests(requests, budget);
         parser = McpPagination.pages(parser, budget);
         return budget;
@@ -19,7 +20,8 @@ public final class McpPaginationAdvice {
 
     @Advice.OnMethodExit(onThrowable = Throwable.class)
     public static void exit(
-            @Advice.Enter McpPagination.Budget budget, @Advice.Thrown Throwable failure) {
-        budget.finish(failure == null);
+            @Advice.Enter McpPagination.Budget budget,
+            @Advice.Thrown(readOnly = false) Throwable failure) {
+        failure = McpPagination.exit(budget, failure);
     }
 }

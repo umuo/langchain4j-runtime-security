@@ -6,10 +6,150 @@ import io.agentsecurity.core.SecurityBlockedException;
 import io.agentsecurity.core.health.McpDiagnostics;
 import io.agentsecurity.core.health.McpDiagnostics.Limit;
 import java.util.Properties;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.Test;
 
 class McpPaginationTest {
+    @Test
+    void deadlineRejectsExactBoundaryAndDoesNotCountTwice() {
+        var clock = new AtomicLong(Long.MAX_VALUE - 100);
+        var metrics = new McpDiagnostics();
+        var budget = new McpPagination.Budget(4, 4, 1024, 1, metrics, clock::get);
+        budget.request();
+        clock.addAndGet(1_000_000); // nanoTime 回绕后，差值仍正确。
+        assertEquals(
+                "mcp-pagination-timeout",
+                assertThrows(SecurityBlockedException.class, () -> budget.accept(1, 2, null))
+                        .ruleId());
+        assertThrows(SecurityBlockedException.class, budget::request);
+        budget.finish(false);
+        assertEquals(1, metrics.snapshot().limits().get(Limit.PAGINATION_TIMEOUT));
+        assertEquals(0, metrics.snapshot().pagesAccepted());
+    }
+
+    @Test
+    void waitUsesRemainingBudgetAndKeepsNativeTimeoutForCancellation() throws Exception {
+        var clock = new AtomicLong();
+        var metrics = new McpDiagnostics();
+        var budget = new McpPagination.Budget(4, 4, 1024, 100, metrics, clock::get);
+        var future =
+                new CompletableFuture<String>() {
+                    @Override
+                    public String get(long timeout, TimeUnit unit) throws TimeoutException {
+                        assertEquals(60_000_000, unit.toNanos(timeout));
+                        clock.addAndGet(60_000_000);
+                        throw new TimeoutException();
+                    }
+                };
+        McpPagination.enter(budget);
+        Throwable failure = new AssertionError("Wait did not complete");
+        try {
+            clock.set(40_000_000);
+            failure =
+                    assertThrows(
+                            TimeoutException.class,
+                            () -> McpPagination.await(future, 2, TimeUnit.SECONDS));
+        } finally {
+            assertInstanceOf(SecurityBlockedException.class, McpPagination.exit(budget, failure));
+        }
+        assertEquals(1, metrics.snapshot().paginationFailed());
+        assertEquals(1, metrics.snapshot().limits().get(Limit.PAGINATION_TIMEOUT));
+        assertThrows(
+                SecurityBlockedException.class,
+                () -> McpPagination.await(future, 1, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void shorterPageTimeoutIsNotRelabeledAsTotalDeadline() {
+        var clock = new AtomicLong();
+        var metrics = new McpDiagnostics();
+        var budget = new McpPagination.Budget(4, 4, 1024, 100, metrics, clock::get);
+        var expected = new TimeoutException();
+        var future =
+                new CompletableFuture<String>() {
+                    @Override
+                    public String get(long timeout, TimeUnit unit) throws TimeoutException {
+                        assertEquals(10_000_000, unit.toNanos(timeout));
+                        clock.addAndGet(10_000_000);
+                        throw expected;
+                    }
+                };
+        McpPagination.enter(budget);
+        Throwable failure =
+                assertThrows(
+                        TimeoutException.class,
+                        () -> McpPagination.await(future, 10, TimeUnit.MILLISECONDS));
+        assertSame(expected, McpPagination.exit(budget, failure));
+        assertEquals(0, metrics.snapshot().limits().get(Limit.PAGINATION_TIMEOUT));
+    }
+
+    @Test
+    void nestedScopeRestoresOuterBudgetAndExpiredFinalResultIsRejected() throws Exception {
+        var clock = new AtomicLong();
+        var metrics = new McpDiagnostics();
+        var outer = new McpPagination.Budget(4, 4, 1024, 100, metrics, clock::get);
+        var inner = new McpPagination.Budget(4, 4, 1024, 100, metrics, clock::get);
+        McpPagination.enter(outer);
+        McpPagination.enter(inner);
+        assertNull(McpPagination.exit(inner, null));
+        assertEquals(
+                "ok",
+                McpPagination.await(CompletableFuture.completedFuture("ok"), 1, TimeUnit.SECONDS));
+        clock.set(100_000_000);
+        assertEquals(
+                "mcp-pagination-timeout",
+                ((SecurityBlockedException) McpPagination.exit(outer, null)).ruleId());
+        assertEquals(1, metrics.snapshot().paginationCompleted());
+        assertEquals(1, metrics.snapshot().paginationFailed());
+    }
+
+    @Test
+    void expiredBeforeWaitStillUsesTimeoutCancellationPath() {
+        var clock = new AtomicLong();
+        var metrics = new McpDiagnostics();
+        var budget = new McpPagination.Budget(1, 1, 1024, 1, metrics, clock::get);
+        var future =
+                new CompletableFuture<String>() {
+                    @Override
+                    public String get(long timeout, TimeUnit unit) {
+                        throw new AssertionError("Expired query must not wait");
+                    }
+                };
+        McpPagination.enter(budget);
+        clock.set(1_000_000);
+        var failure =
+                assertThrows(
+                        TimeoutException.class,
+                        () -> McpPagination.await(future, 1, TimeUnit.SECONDS));
+        assertInstanceOf(SecurityBlockedException.class, McpPagination.exit(budget, failure));
+    }
+
+    @Test
+    void interruptionRemainsOriginalFailureAndScopeIsCleaned() {
+        var expected = new InterruptedException("fixture");
+        var budget = new McpPagination.Budget(1, 1, 1024, new McpDiagnostics());
+        var future =
+                new CompletableFuture<String>() {
+                    @Override
+                    public String get(long timeout, TimeUnit unit) throws InterruptedException {
+                        throw expected;
+                    }
+                };
+        McpPagination.enter(budget);
+        var failure =
+                assertThrows(
+                        InterruptedException.class,
+                        () -> McpPagination.await(future, 1, TimeUnit.SECONDS));
+        assertSame(expected, McpPagination.exit(budget, failure));
+        assertThrows(
+                SecurityBlockedException.class,
+                () -> McpPagination.await(future, 1, TimeUnit.SECONDS));
+    }
+
     @Test
     void pageLimitRejectsBeforeRequestFactoryAndCountsOnce() {
         var diagnostics = new McpDiagnostics();
@@ -117,6 +257,11 @@ class McpPaginationTest {
         assertThrows(IllegalArgumentException.class, () -> McpPagination.initialize(properties));
         properties.clear();
         properties.setProperty("mcp.pagination.max.items", "129");
+        assertThrows(IllegalArgumentException.class, () -> McpPagination.initialize(properties));
+        properties.clear();
+        properties.setProperty("mcp.pagination.timeout.ms", "0");
+        assertThrows(IllegalArgumentException.class, () -> McpPagination.initialize(properties));
+        properties.setProperty("mcp.pagination.timeout.ms", "300001");
         assertThrows(IllegalArgumentException.class, () -> McpPagination.initialize(properties));
         McpPagination.initialize(new Properties());
     }

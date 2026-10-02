@@ -8,16 +8,22 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.LongSupplier;
 
-/** 对固定版本 fetchPaginatedList 的单次调用分配预算，不使用跨请求 ThreadLocal 状态。 */
+/** 对固定版本 fetchPaginatedList 的单次调用分配预算，预算独立，等待调用通过可嵌套且在出口清理的线程作用域关联。 */
 public final class McpPagination {
-    private record Settings(int pages, int items, int bytes) {}
+    private record Settings(int pages, int items, int bytes, int timeoutMillis) {}
 
     private record Accessors(Method items, Method cursor) {}
 
-    private static volatile Settings settings = new Settings(16, 128, 1_048_576);
+    private static volatile Settings settings = new Settings(16, 128, 1_048_576, 30_000);
+    private static final ThreadLocal<Budget> CURRENT = new ThreadLocal<>();
     private static final ClassValue<Accessors> ACCESSORS =
             new ClassValue<>() {
                 @Override
@@ -45,11 +51,8 @@ public final class McpPagination {
                 new Settings(
                         setting(properties, "mcp.pagination.max.pages", 16, 256),
                         setting(properties, "mcp.pagination.max.items", 128, 128),
-                        setting(
-                                properties,
-                                "mcp.pagination.max.json.bytes",
-                                1_048_576,
-                                16_777_216));
+                        setting(properties, "mcp.pagination.max.json.bytes", 1_048_576, 16_777_216),
+                        setting(properties, "mcp.pagination.timeout.ms", 30_000, 300_000));
     }
 
     private static int setting(Properties properties, String name, int fallback, int max) {
@@ -63,7 +66,61 @@ public final class McpPagination {
     public static Budget begin() {
         Settings current = settings;
         return new Budget(
-                current.pages(), current.items(), current.bytes(), McpDiagnostics.global());
+                current.pages(),
+                current.items(),
+                current.bytes(),
+                current.timeoutMillis(),
+                McpDiagnostics.global(),
+                System::nanoTime);
+    }
+
+    /** 仅替换固定客户端分页方法内的 Future.get，不修改其他业务的等待行为。 */
+    public static <T> T await(CompletableFuture<T> future, long timeout, TimeUnit unit)
+            throws InterruptedException, ExecutionException, TimeoutException {
+        Budget budget = CURRENT.get();
+        if (budget == null) {
+            throw shape();
+        }
+        long remaining = budget.remaining();
+        if (remaining <= 0) {
+            budget.reject(Limit.PAGINATION_TIMEOUT);
+            throw new TimeoutException("mcp-pagination-timeout");
+        }
+        try {
+            return future.get(Math.min(unit.toNanos(timeout), remaining), TimeUnit.NANOSECONDS);
+        } catch (TimeoutException failure) {
+            if (budget.remaining() <= 0) {
+                budget.reject(Limit.PAGINATION_TIMEOUT);
+            }
+            // 由原客户端取消 Future、清理 pendingOperations 并发送协议取消通知。
+            throw failure;
+        }
+    }
+
+    public static void enter(Budget budget) {
+        budget.previous = CURRENT.get();
+        CURRENT.set(budget);
+    }
+
+    /** 即使解析失败或超时也恢复外层预算，避免线程池复用时污染下一次查询。 */
+    public static Throwable exit(Budget budget, Throwable failure) {
+        try {
+            if (failure == null && budget.remaining() <= 0) {
+                budget.reject(Limit.PAGINATION_TIMEOUT);
+            }
+            if (budget.failure == Limit.PAGINATION_TIMEOUT) {
+                failure = new SecurityBlockedException("mcp-pagination-timeout");
+            }
+            budget.finish(failure == null);
+            return failure;
+        } finally {
+            if (budget.previous == null) {
+                CURRENT.remove();
+            } else {
+                CURRENT.set(budget.previous);
+            }
+            budget.previous = null;
+        }
     }
 
     public static <T> BiFunction<Long, String, T> requests(
@@ -107,6 +164,10 @@ public final class McpPagination {
         private final int maxItems;
         private final int maxBytes;
         private final McpDiagnostics diagnostics;
+        private final LongSupplier clock;
+        private final long started;
+        private final long timeoutNanos;
+        private Budget previous;
         private final Set<String> cursors = new HashSet<>();
         private int pages;
         private int items;
@@ -116,6 +177,20 @@ public final class McpPagination {
         private boolean finished;
 
         public Budget(int maxPages, int maxItems, int maxBytes, McpDiagnostics diagnostics) {
+            this(maxPages, maxItems, maxBytes, 30_000, diagnostics, System::nanoTime);
+        }
+
+        // 测试注入单调时钟，避免边界测试依赖真实睡眠。
+        Budget(
+                int maxPages,
+                int maxItems,
+                int maxBytes,
+                int timeoutMillis,
+                McpDiagnostics diagnostics,
+                LongSupplier clock) {
+            if (timeoutMillis < 1 || timeoutMillis > 300_000) {
+                throw new IllegalArgumentException("Invalid MCP pagination timeout");
+            }
             if (maxPages < 1
                     || maxPages > 256
                     || maxItems < 1
@@ -128,6 +203,9 @@ public final class McpPagination {
             this.maxItems = maxItems;
             this.maxBytes = maxBytes;
             this.diagnostics = java.util.Objects.requireNonNull(diagnostics);
+            this.clock = java.util.Objects.requireNonNull(clock);
+            this.started = clock.getAsLong();
+            this.timeoutNanos = TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
             diagnostics.paginationStarted();
         }
 
@@ -188,12 +266,19 @@ public final class McpPagination {
             diagnostics.pageAccepted(count, size);
         }
 
+        private long remaining() {
+            return timeoutNanos - (clock.getAsLong() - started);
+        }
+
         private void active() {
             if (failure != null) {
                 throw new SecurityBlockedException(rule(failure));
             }
             if (finished) {
                 throw shape();
+            }
+            if (remaining() <= 0) {
+                throw reject(Limit.PAGINATION_TIMEOUT);
             }
         }
 
@@ -212,6 +297,7 @@ public final class McpPagination {
                         case PAGINATION_ITEMS -> "items";
                         case PAGINATION_BYTES -> "bytes";
                         case PAGINATION_CURSOR -> "cursor";
+                        case PAGINATION_TIMEOUT -> "timeout";
                         default -> throw new IllegalArgumentException("Not a pagination limit");
                     };
         }
