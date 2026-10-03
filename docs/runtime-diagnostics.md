@@ -13,6 +13,7 @@ var coverage = AgentCoverage.global().snapshot();
 System.out.println("installed=" + coverage.installed());
 System.out.println("failed=" + coverage.failed());
 System.out.println("supported=" + AgentCoverage.SUPPORTED_LANGCHAIN4J);
+System.out.println("accepted=" + AgentCoverage.ACCEPTED_LANGCHAIN4J);
 System.out.println("versionChecksPassed=" + coverage.versionChecksPassed());
 System.out.println("versionChecksFailed=" + coverage.versionChecksFailed());
 // 以下类名清单仅在受限运维端点展示，不作为指标标签。
@@ -30,7 +31,7 @@ System.out.println(coverage.transformedTypes());
 | versionChecksPassed / Failed | 实际版本检查的成功/失败次数 | 唯一 ClassLoader 数；缓存命中不递增，并发首次检查可能重复 |
 | detector / audit | Agent 绑定实例的执行池健康快照 | null 是健康；null 表示未绑定或当前实例不是 Agent 共享实例 |
 
-当前支持版本常量是 1.20.0，运行时版本拒绝逻辑使用同一个常量。尚未执行任何受保护调用时，版本检查计数为零是正常的，不代表兼容性已经确认。
+完整验证基准常量是 `1.20.0`，运行时准入为 `1.20.x`／`1.21.x` 正式补丁版本并要求关键 API 检查通过，详见 [版本准入](langchain4j-compatibility.md)。尚未执行任何受保护调用时，版本检查计数为零是正常的，不代表兼容性已经确认。
 
 诊断状态的写入口服务于 Agent 初始化和插桩回调；同 JVM 任意代码可以调用，因此快照不是防篡改证明。即使人为改动诊断信息，也不会解除 Bridge 的拒绝状态。不要把诊断标志作为放行依据。
 

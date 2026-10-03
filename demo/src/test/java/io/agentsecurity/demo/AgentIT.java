@@ -40,6 +40,11 @@ class AgentIT {
     }
 
     private String run(String scenario, boolean agent, Path config) throws Exception {
+        return run(scenario, agent, config, null);
+    }
+
+    private String run(String scenario, boolean agent, Path config, Path metadata)
+            throws Exception {
         var command = new ArrayList<String>();
         command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
         if (agent) {
@@ -50,8 +55,17 @@ class AgentIT {
                             + "="
                             + config);
         }
-        command.add("-jar");
-        command.add(root.resolve("demo/target/agent-security-demo.jar").toString());
+        if (metadata == null) {
+            command.add("-jar");
+            command.add(root.resolve("demo/target/agent-security-demo.jar").toString());
+        } else {
+            command.add("-cp");
+            command.add(
+                    metadata
+                            + java.io.File.pathSeparator
+                            + root.resolve("demo/target/agent-security-demo.jar"));
+            command.add("io.agentsecurity.demo.Demo");
+        }
         command.add(scenario);
         Path log = temporary.resolve("process-" + System.nanoTime() + ".log");
         Process process =
@@ -70,6 +84,37 @@ class AgentIT {
             assertTrue(output.contains("instrumented="), output);
         }
         return output;
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+        "1.20.1,allowed,false,2,1",
+        "1.20.1,direct-tool,true,0,0",
+        "1.21.0,allowed,false,2,1",
+        "1.21.0,direct-tool,true,0,0",
+        "1.22.0,allowed,true,0,0",
+        "1.20.1-SNAPSHOT,allowed,true,0,0"
+    })
+    void versionAdmissionPreservesThePackagedAgentSecurityBoundary(
+            String version, String scenario, boolean blocked, int models, int tools)
+            throws Exception {
+        // Change metadata only: this tests admission, not compatibility of a different artifact.
+        Path metadata = temporary.resolve("metadata");
+        Path properties =
+                metadata.resolve("META-INF/maven/dev.langchain4j/langchain4j-core/pom.properties");
+        Files.createDirectories(properties.getParent());
+        Files.writeString(properties, "version=" + version + "\n");
+        String output = run(scenario, true, root.resolve("config/demo.properties"), metadata);
+        assertTrue(
+                output.contains(
+                        "blocked=" + blocked + " modelCalls=" + models + " toolCalls=" + tools),
+                output);
+        if (scenario.equals("direct-tool")) {
+            assertTrue(output.contains("rule=denied-tool"), output);
+        }
+        if (version.equals("1.22.0") || version.endsWith("-SNAPSHOT")) {
+            assertTrue(output.contains("unsupported-langchain4j-version"), output);
+        }
     }
 
     @ParameterizedTest

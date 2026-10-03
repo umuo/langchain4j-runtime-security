@@ -73,6 +73,7 @@ nav:
       - 可观测性与发展规划: observability.md
       - 结构化故障诊断: failure-diagnostics.md
       - 覆盖与健康诊断: runtime-diagnostics.md
+      - LangChain4j 版本准入: langchain4j-compatibility.md
       - 性能诊断基线: performance-baseline.md
       - 恢复与子树验证: recovery-validation.md
       - Collector 与 TLS 验收: collector-acceptance.md

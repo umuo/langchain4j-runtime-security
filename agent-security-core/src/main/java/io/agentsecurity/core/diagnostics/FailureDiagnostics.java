@@ -168,6 +168,7 @@ public final class FailureDiagnostics {
                         Category.CAPACITY_LIMIT;
                 case "unsupported-mcp-version",
                                 "unsupported-langchain4j-version",
+                                "incompatible-langchain4j-api",
                                 "unsupported-mcp-content",
                                 "mcp-discovery-metadata-unsupported",
                                 "mcp-result-attributes-unsupported",

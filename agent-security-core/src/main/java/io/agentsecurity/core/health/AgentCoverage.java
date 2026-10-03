@@ -5,7 +5,14 @@ import java.util.List;
 
 /** 有界插桩诊断。不持有 Class 或 ClassLoader，不代表未加载代码已经受到保护。 */
 public final class AgentCoverage {
+    /** 完整回归验证的基准版本；不等于运行时准入范围。 */
     public static final String SUPPORTED_LANGCHAIN4J = "1.20.0";
+
+    /** 同一小版本系列的正式补丁版本仍需通过关键 API 检查。 */
+    public static final String ACCEPTED_LANGCHAIN4J = "1.20.x,1.21.x";
+
+    public static final List<String> VERIFIED_LANGCHAIN4J =
+            List.of(SUPPORTED_LANGCHAIN4J, "1.21.0");
 
     public record Snapshot(
             boolean installed,

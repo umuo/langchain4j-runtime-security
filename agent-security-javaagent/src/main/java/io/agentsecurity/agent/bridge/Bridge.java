@@ -289,10 +289,10 @@ public final class Bridge {
             }
             Properties p = new Properties();
             p.load(stream);
-            if (!io.agentsecurity.core.health.AgentCoverage.SUPPORTED_LANGCHAIN4J.equals(
-                    p.getProperty("version"))) {
+            if (!LangChain4jCompatibility.accepts(p.getProperty("version"))) {
                 throw new SecurityBlockedException("unsupported-langchain4j-version");
             }
+            LangChain4jCompatibility.verifyApi(loader);
             checkedLoaders.put(loader, Boolean.TRUE);
             io.agentsecurity.core.health.AgentCoverage.global().versionChecked(true);
         } catch (SecurityBlockedException denied) {

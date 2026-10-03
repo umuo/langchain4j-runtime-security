@@ -43,7 +43,7 @@ import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.utility.JavaModule;
 
-/** 集中注册固定 LangChain4j 版本的增强规则；实际拦截逻辑由独立 Advice 实现。 */
+/** 集中注册已适配 LangChain4j API 的增强规则；实际拦截逻辑由独立 Advice 实现。 */
 public final class AgentInstrumentation {
 
     private static java.lang.reflect.Method paginationAwait() {
@@ -469,6 +469,8 @@ public final class AgentInstrumentation {
         instrumentation.addTransformer(
                 new FailClosedTransformer(transformer, failedTransform), false);
         System.err.println(
-                "[agent-security] installed; supported-langchain4j=1.20.0; mode=enforce; streaming=buffer-until-validated");
+                "[agent-security] installed; accepted-langchain4j="
+                        + io.agentsecurity.core.health.AgentCoverage.ACCEPTED_LANGCHAIN4J
+                        + "; api-check=required; mode=enforce; streaming=buffer-until-validated");
     }
 }

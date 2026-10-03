@@ -5,7 +5,7 @@
 Agent Security 将独立安全 SDK 与 Java Agent 自动插桩结合，在 LangChain4j 的模型、工具、检索和会话记忆入口执行策略检查。
 
 !!! warning "当前状态"
-    项目适配固定 LangChain4j 1.20.0，仍处于生产化开发阶段。请先阅读[生产验收清单](production-readiness.md)及各模块的支持边界；Java Agent 不是 JVM 沙箱。
+    项目默认构建使用 LangChain4j 1.20.0，另验证 1.21.0；版本准入见[兼容性说明](langchain4j-compatibility.md)，仍处于生产化开发阶段。请先阅读[生产验收清单](production-readiness.md)及各模块的支持边界；Java Agent 不是 JVM 沙箱。
 
 ## 从这里开始
 

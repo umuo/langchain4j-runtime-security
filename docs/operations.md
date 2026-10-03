@@ -35,7 +35,8 @@ SDK 抛出 `SecurityBlockedException`，`ruleId()` 是稳定原因标识。异�
 | `detector-interrupted` / `detector-closed` | 调用中断或执行器关闭 | 停止请求，核查生命周期／取消行为 |
 | `audit-error` | 审计写入失败、等待超时、容量耗尽或实例已关闭 | Agent 审计持续拒绝直到重启；先修复存储／权限／压力问题 |
 | `instrumentation-error` | 类增强失败 | 停止引流，检查 Agent 顺序与支持矩阵；失败类拒绝定义 |
-| `unsupported-langchain4j-version` / `missing-version-metadata` | 版本不在支持范围或缺少元数据 | 固定受支持依赖，保留版本元数据；不要关闭检查掩盖不兼容 |
+| `unsupported-langchain4j-version` / `missing-version-metadata` | core 不属于 `1.20.x`／`1.21.x` 正式版本或缺少元数据 | 对齐依赖并保留版本元数据，见 [版本准入](langchain4j-compatibility.md) |
+| `incompatible-langchain4j-api` | 关键类、方法参数或返回类型不符合契约 | 检查运行时混用依赖，回退至完整验证基准 `1.20.0` 或补充对应适配 |
 | `unsupported-stream-event` / `unsupported-content` | 事件或内容未支持 | 使用已验证路径；需要新增适配和验证才能放开 |
 | `stream-buffer-limit` / `stream-capacity` | 流缓冲或共享活跃流数量达到上限 | 限制生成长度、检查消费者是否及时消费／取消，依据实测调整容量 |
 | `stream-timeout` | 生成、检查或消费等待超过流截止时间 | 检查模型延迟和订阅者 demand；丢弃尚未交付的缓冲内容，取消上游 |

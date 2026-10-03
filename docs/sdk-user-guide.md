@@ -2,7 +2,7 @@
 
 本文是新用户的统一入口。先看功能表和接入选择，再运行一个拒绝示例；需要某项能力时，按对应步骤接入，详细规则查专题文档。无需先阅读源码。
 
-本文对应仓库 `0.1.0-SNAPSHOT` 当前实现：Java Agent 固定适配 **LangChain4j core 1.20.0、MCP 1.20.0-beta30**。源码按 Java 17 编译，最近完整发布验证运行于 macOS arm64 / JDK 21.0.4；634 项测试通过不等于所有平台、外部服务或生产场景均已验收。SDK、Agent、插件应来自同一构建，不能只凭相同 SNAPSHOT 版本号混用。
+本文对应仓库 `0.1.0-SNAPSHOT` 当前实现：Java Agent 默认构建使用 **LangChain4j core 1.20.0**，另验证 **core 1.21.0**；运行时准入 **1.20.x／1.21.x 正式补丁版本 + 关键 API 检查**，MCP 仍要求 **1.20.0-beta30**，详见 [版本准入](langchain4j-compatibility.md)。源码按 Java 17 编译，最近完整发布验证运行于 macOS arm64 / JDK 21.0.4；634 项测试通过不等于所有平台、外部服务或生产场景均已验收。SDK、Agent、插件应来自同一构建，不能只凭相同 SNAPSHOT 版本号混用。
 
 ## 1. 它解决什么问题
 
@@ -400,7 +400,8 @@ Agent 未配置 audit.path 时用脱敏 stderr 审计；需要文件日志时设
 | 症状／ruleId | 优先检查 | 处理 |
 | --- | --- | --- |
 | 启动配置错误 | 路径、未知键、文件编码、JSON 规则 | 修正配置后重启 |
-| `unsupported-langchain4j-version`／`unsupported-mcp-version` | 应用实际依赖及版本元数据 | 对齐固定支持版本，不跳过检查 |
+| `unsupported-langchain4j-version`／`unsupported-mcp-version` | 应用实际依赖及版本元数据 | core 接受 `1.20.x`／`1.21.x` 正式补丁版本，MCP 仍为 `1.20.0-beta30`，不跳过检查 |
+| `incompatible-langchain4j-api` | 关键 API 契约或依赖冲突 | 对齐依赖或补充适配，见 [版本准入](langchain4j-compatibility.md) |
 | 工具不执行、`tool-not-allowed` | 工具暴露名和所有策略允许范围 | 修正必要授权，重跑计数验收 |
 | `tool-argument-policy`／`permission-denied` | 解码参数、权限和可信租户绑定 | 调整合法请求或授权，不吞拒绝继续执行 |
 | `missing-security-context` | 认证作用域和异步传播 | 补齐可信上下文，不采用模型提供的身份 |

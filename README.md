@@ -2,7 +2,7 @@
 
 独立安全 SDK 内核 + `-javaagent` 自动插桩。基础内容／工具策略只需在启动时加载 Agent 和策略文件；用户／租户权限策略另需应用在认证入口提供可信身份，无需改写 LangChain4j 调用。
 
-当前处于 **固定 LangChain4j 1.20.0 的生产化开发阶段**，尚未达到全部生产验收要求。测试使用真实 LangChain4j AI Services / 工具执行器、官方模型客户端和本机 HTTP/SSE 端点，不调用外部模型、不需要 API key。源码按 Java 17 编译，当前验证运行环境是 JDK 21。完整缺口见 [生产验收清单](docs/production-readiness.md)。
+当前处于 **以 LangChain4j 1.20.0 为构建基准的生产化开发阶段**，尚未达到全部生产验收要求。测试使用真实 LangChain4j AI Services / 工具执行器、官方模型客户端和本机 HTTP/SSE 端点，不调用外部模型、不需要 API key。源码按 Java 17 编译，当前验证运行环境是 JDK 21。完整缺口见 [生产验收清单](docs/production-readiness.md)。
 
 新用户先阅读 [SDK 使用手册](docs/sdk-user-guide.md)：功能总览、接入方式选择、可运行示例、专属策略扩展、预算与取消、配置和排错。
 
@@ -187,7 +187,7 @@ detector.max.concurrent=4
 - 检测器抛出运行时异常或返回 null：拒绝，原因 `detector-error`。
 - 检测超时、容量耗尽、调用线程中断、执行器关闭：分别拒绝为 `detector-timeout`、`detector-capacity`、`detector-interrupted`、`detector-closed`。本地字面规则仍在调用线程执行；上述预算不能保证整个业务调用在相同时间内返回。
 - 输入／工具执行前拒绝：底层被保护方法不执行。
-- 版本检查：受保护入口运行时校验 `langchain4j-core` 的 Maven 元数据，只接受 `1.20.0`；检查不是对任意混用依赖的完整兼容性证明。
+- 版本检查：受保护入口运行时校验 `langchain4j-core` 的 Maven 元数据，接受 `1.20.x`／`1.21.x` 正式补丁版本并检查关键 API；真实依赖回归覆盖 `1.20.0` 和 `1.21.0`。见 [版本准入](docs/langchain4j-compatibility.md)，检查不是对任意混用依赖的完整兼容性证明。
 - 转换失败：输出 `TRANSFORM_ERROR`，拒绝该类的定义（`ClassFormatError`），后续受保护调用拒绝为 `instrumentation-error`；不直接终止宿主 JVM。JVM 会忽略普通 transformer 异常，因此不能仅抛异常后继续加载原始字节码。应用是否能从类加载失败恢复取决于应用本身，SDK 不承诺维持其可用性。
 - 默认审计到 stderr；配置 `audit.path` 后改为 JSONL 文件，记录时间、随机事件 ID、上下文 runId、阶段、ALLOW/DENY、规则 ID、规则版本。内置日志不序列化 prompt、工具参数、结果、用户／租户标识或权限；stderr 不是持久化存储。
 - 审计收到写入确认后才释放受保护操作。写入异常、超时、队列满：拒绝为 `audit-error`，该审计实例在重启前持续拒绝。文件写入失败后也停止接受新记录，避免部分写入后继续追加。审计故障本身可能无法写入该文件，应监控业务错误和进程状态。
