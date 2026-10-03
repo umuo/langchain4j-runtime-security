@@ -86,6 +86,22 @@ public final class AgentRuntime implements AutoCloseable {
             SecurityContext authenticatedUser,
             AgentGrant authorizedGrant,
             Duration lifetime) {
+        return startRoot(
+                agentId,
+                authenticatedUser,
+                authorizedGrant,
+                lifetime,
+                AgentBudgetLimits.defaults());
+    }
+
+    /** 预算由可信入口设置，同一根任务的所有后代共享，子任务不能自行增加。 */
+    public synchronized AgentInvocation startRoot(
+            String agentId,
+            SecurityContext authenticatedUser,
+            AgentGrant authorizedGrant,
+            Duration lifetime,
+            AgentBudgetLimits budget) {
+        Objects.requireNonNull(budget);
         Objects.requireNonNull(authenticatedUser);
         var current = SecurityContexts.current();
         if (authenticatedUser.invocation() != null
@@ -103,15 +119,16 @@ public final class AgentRuntime implements AutoCloseable {
                         effective.tools(),
                         effective.retrievers(),
                         effective.memoryResources());
-        return register(
+        var root =
                 new AgentInvocation(
                         this,
                         null,
                         agentId,
                         effective,
                         authenticatedUser,
-                        System.nanoTime() + lifetimeNanos(lifetime)),
-                SecurityEvent.Phase.AGENT_START);
+                        System.nanoTime() + lifetimeNanos(lifetime));
+        root.budgetLimits = budget;
+        return register(root, SecurityEvent.Phase.AGENT_START);
     }
 
     /** 必须在有效父执行作用域中申请子任务，父身份不能由请求参数指定。 */
@@ -160,9 +177,19 @@ public final class AgentRuntime implements AutoCloseable {
 
     private AgentInvocation register(AgentInvocation invocation, SecurityEvent.Phase phase) {
         expireNow();
+        // 清理可能恰好终止父树，不能在失效父节点下登记孤立的孩子。
+        if (invocation.parent != null) {
+            requireActive(invocation.parent.context());
+        }
         if (active.size() >= limits.maxInvocations()) {
             throw new SecurityBlockedException("agent-capacity");
         }
+        var root = root(invocation);
+        if (root.budgetInvocations >= root.budgetLimits.maxInvocations()) {
+            finish(root, AgentEndReason.BUDGET_EXHAUSTED);
+            throw new SecurityBlockedException("agent-budget-invocations");
+        }
+        root.budgetInvocations++;
         active.put(invocation.invocationId(), invocation);
         try {
             emit(invocation, phase);
@@ -178,6 +205,38 @@ public final class AgentRuntime implements AutoCloseable {
             }
             throw error;
         }
+    }
+
+    private AgentInvocation root(AgentInvocation invocation) {
+        var node = invocation;
+        while (node.parent != null) {
+            node = node.parent;
+        }
+        return node;
+    }
+
+    /** 与登记、失效共用一把锁，保证多个兄弟任务不能同时花掉最后一份额度。 */
+    synchronized void consumeProtectedCheck(SecurityContext context) {
+        requireActive(context);
+        var root = root(context.invocation());
+        if (root.budgetChecks >= root.budgetLimits.maxProtectedChecks()) {
+            finish(root, AgentEndReason.BUDGET_EXHAUSTED);
+            throw new SecurityBlockedException("agent-budget-checks");
+        }
+        root.budgetChecks++;
+    }
+
+    public record BudgetSnapshot(AgentBudgetLimits limits, int invocations, long protectedChecks) {}
+
+    synchronized BudgetSnapshot budgetSnapshot(AgentInvocation invocation) {
+        var root = root(invocation);
+        return new BudgetSnapshot(root.budgetLimits, root.budgetInvocations, root.budgetChecks);
+    }
+
+    /** 成功交付结果和撤销在同一锁内排序，已取消的业务任务不能交付成功结果。 */
+    synchronized void complete(AgentInvocation invocation) {
+        requireActive(invocation.context());
+        finish(invocation, AgentEndReason.COMPLETED);
     }
 
     private boolean expired(AgentInvocation invocation) {

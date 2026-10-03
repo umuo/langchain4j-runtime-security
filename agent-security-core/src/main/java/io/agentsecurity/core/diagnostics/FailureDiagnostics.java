@@ -150,10 +150,12 @@ public final class FailureDiagnostics {
                 case "mcp-http-unavailable", "mcp-http-transport-failed" ->
                         Category.TRANSPORT_FAILURE;
                 case "instrumentation-error" -> Category.INSTRUMENTATION_FAILURE;
-                case "audit-error" -> Category.AUDIT_FAILURE;
+                case "audit-error", "agent-audit-error" -> Category.AUDIT_FAILURE;
                 case "detector-timeout", "detector-remote-timeout", "mcp-pagination-timeout" ->
                         Category.TIMEOUT;
-                case "mcp-response-limit",
+                case "agent-budget-invocations",
+                                "agent-budget-checks",
+                                "mcp-response-limit",
                                 "mcp-pagination-pages",
                                 "mcp-pagination-items",
                                 "mcp-pagination-bytes",

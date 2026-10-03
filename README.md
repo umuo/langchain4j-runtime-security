@@ -218,7 +218,7 @@ audit.queue.capacity=128
 
 没有外部模型推理效果或性能数据；官方客户端连接本机端点的测试证明指定边界的工程行为，不证明提示注入检测准确率。
 
-已补远程检测客户端与运行健康指标；已提供 [策略原子发布与回滚](docs/policy-versioning.md)；已补 [MCP 工具边界](docs/mcp-security.md)；已补 [资源/提示词及真实传输验收](docs/mcp-content-security.md)；已补 [发现与响应容量限制](docs/mcp-discovery-limits.md)；已补 [分页预算与容量指标](docs/mcp-pagination-metrics.md)；已补整次分页查询的时间预算；已补 [结构化故障诊断](docs/failure-diagnostics.md)；已补 [MCP HTTP 认证与故障治理](docs/mcp-http-auth-security.md)；后续推进多 Agent 共享预算和发布验收。RAG 与 memory 的接入及未覆盖路径见 [RAG](docs/rag-security.md) 和 [ChatMemory](docs/memory-security.md)。当前仍不能标记为完整生产可用。
+已补远程检测客户端与运行健康指标；已提供 [策略原子发布与回滚](docs/policy-versioning.md)；已补 [MCP 工具边界](docs/mcp-security.md)；已补 [资源/提示词及真实传输验收](docs/mcp-content-security.md)；已补 [发现与响应容量限制](docs/mcp-discovery-limits.md)；已补 [分页预算与容量指标](docs/mcp-pagination-metrics.md)；已补整次分页查询的时间预算；已补 [结构化故障诊断](docs/failure-diagnostics.md)；已补 [MCP HTTP 认证与故障治理](docs/mcp-http-auth-security.md)；已补 [多 Agent 共享预算与协作式取消](docs/multi-agent-budget.md)；后续推进发布与性能验收。RAG 与 memory 的接入及未覆盖路径见 [RAG](docs/rag-security.md) 和 [ChatMemory](docs/memory-security.md)。当前仍不能标记为完整生产可用。
 
 ## 流式安全模式
 

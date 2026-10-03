@@ -180,7 +180,13 @@ class LifecycleTest {
             var revoke = pool.submit(root::revoke);
             release.countDown();
             revoke.get();
-            result.get();
+            try {
+                assertEquals("done", result.get());
+                assertEquals(AgentEndReason.COMPLETED, root.endReason());
+            } catch (ExecutionException denied) {
+                assertInstanceOf(SecurityBlockedException.class, denied.getCause());
+                assertEquals(AgentEndReason.REVOKED, root.endReason());
+            }
             assertTrue(
                     Set.of(AgentEndReason.REVOKED, AgentEndReason.COMPLETED)
                             .contains(root.endReason()));

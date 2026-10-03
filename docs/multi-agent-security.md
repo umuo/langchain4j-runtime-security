@@ -201,7 +201,7 @@ Agent 原有决策审计与 runtime 生命周期审计是两条可关联的流�
 
 `runtime.expireNow()` 可主动触发清理。后台每 100ms 是检查频率，不是硬实时保证；JVM 调度、锁竞争和逐节点审计可能延迟终止事件。整批授权在审计前失效，但大子树的逐节点审计总耗时会随节点数增长。后台审计失败后持续拒绝后续受保护操作，需运维处理并重建实例。
 
-完成、撤销和取消竞态中，第一个在 runtime 锁内完成的终止原因胜出。失效不保证业务线程或已发出的 I/O 立刻停止，也不回滚副作用；已经执行的 Callable 仍可能返回值。资源鉴权和事务仍由业务提供。
+完成、撤销和取消竞态中，第一个在 runtime 锁内完成的终止原因胜出。失效不保证业务线程或已发出的 I/O 立刻停止，也不回滚副作用；取消先完成时，Callable 随后返回的值不再作为成功结果交付；业务代码本身仍可能继续运行。资源鉴权和事务仍由业务提供。
 
 Prometheus 可调用 `PrometheusMetrics.render(telemetry, exporter, runtime)`，增加：
 
@@ -210,3 +210,8 @@ Prometheus 可调用 `PrometheusMetrics.render(telemetry, exporter, runtime)`，
 - `agent_security_invocations_ended_total{reason}`：按有限原因枚举分类的终止计数。
 
 该重载对应一个 runtime，多实例宿主应明确聚合，不能直接拼接多份同名指标。调度器和导出器分别关闭，避免调度器还在产生终止记录时提前停止导出。
+
+
+## 共享预算与取消
+
+可信入口可以为根任务指定累计登记次数和入口检查次数，所有后代共享、结束不退款。超额使整棵树失效；`cancel()` 可协作式取消子树。详细接入、扣费语义、结果交付竞态与外部 I/O 边界见 [共享预算指南](multi-agent-budget.md)。

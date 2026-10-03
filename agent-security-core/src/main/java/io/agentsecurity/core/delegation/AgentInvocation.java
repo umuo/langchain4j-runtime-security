@@ -16,6 +16,10 @@ public final class AgentInvocation implements AutoCloseable {
     final long deadline;
     final int depth;
     final long createdNanos = System.nanoTime();
+    // 仅根执行持有累计计数，所有读写通过运行时锁完成。
+    AgentBudgetLimits budgetLimits;
+    int budgetInvocations;
+    long budgetChecks;
     private volatile AgentEndReason endReason;
     private volatile long lifetimeNanos;
     private final UUID invocationId = UUID.randomUUID();
@@ -45,6 +49,16 @@ public final class AgentInvocation implements AutoCloseable {
                         identity.principalId(),
                         grant.permissions(),
                         this);
+    }
+
+    /** 即使任务已结束也可读取最终预算，不包含业务正文或身份信息。 */
+    public AgentRuntime.BudgetSnapshot budgetSnapshot() {
+        return runtime.budgetSnapshot(this);
+    }
+
+    /** 协作式取消整棵子树；后续安全检查和成功结果交付均拒绝。 */
+    public void cancel() {
+        runtime.finish(this, AgentEndReason.CANCELLED);
     }
 
     public int depth() {
@@ -148,7 +162,7 @@ public final class AgentInvocation implements AutoCloseable {
             try (var scope = SecurityContexts.open(context)) {
                 value = task.call();
             }
-            runtime.finish(this, AgentEndReason.COMPLETED);
+            runtime.complete(this);
             return value;
         } catch (Exception | Error error) {
             failure = error;

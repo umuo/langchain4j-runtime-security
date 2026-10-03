@@ -24,6 +24,7 @@ Agent Security 将独立安全 SDK 与 Java Agent 自动插桩结合，在 LangC
 | 从示例入手，逐步跟踪拦截与检测源码 | [源码学习指南](source-learning.md) |
 | 安全指标、关联记录与导出扩展 | [可观测性与发展规划](observability.md) |
 | 父子 Agent 追踪、逐级授权与撤销 | [多 Agent 安全](multi-agent-security.md) |
+| 多个 Agent 共用次数预算、任务取消 | [共享预算与取消](multi-agent-budget.md) |
 | 编写项目专属策略、插件注册、自定义审计 | [SDK 扩展指南](sdk-extension.md) |
 | 工具准入、参数校验、执行前拦截 | [工具权限与参数规则](tool-policy.md) |
 | 身份认证结果接入、租户绑定、异步上下文 | [可信身份与异步传播](security-context.md) |

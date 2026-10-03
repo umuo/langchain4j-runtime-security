@@ -175,16 +175,21 @@ class AgentRuntimeTest {
                 var root = runtime.startRoot("planner", USER, FULL, TTL);
                 var other = runtime.startRoot("reader", USER, READ, TTL);
                 var engine = engine()) {
-            root.call(
-                    () -> {
-                        var child = runtime.delegate("reader", READ, TTL);
-                        root.revoke();
-                        denied(
-                                "agent-invocation-inactive",
-                                () -> engine.check(event(child.context(), "lookup")));
-                        engine.check(event(other.context(), "lookup"));
-                        return null;
-                    });
+            denied(
+                    "agent-invocation-inactive",
+                    () ->
+                            root.call(
+                                    () -> {
+                                        var child = runtime.delegate("reader", READ, TTL);
+                                        root.revoke();
+                                        denied(
+                                                "agent-invocation-inactive",
+                                                () ->
+                                                        engine.check(
+                                                                event(child.context(), "lookup")));
+                                        engine.check(event(other.context(), "lookup"));
+                                        return null;
+                                    }));
         }
     }
 

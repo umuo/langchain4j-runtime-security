@@ -95,7 +95,7 @@ PolicyEngine 的最终拒绝绑定实际选中的版本快照。即使审计期�
 - 上述 MCP 方法体异常、分页容量与总时间预算失败；异步工具回调使用入口捕获的身份。
 - 插桩失败的进程内故障记录，不附带类型名、ClassLoader 或原异常对象。类无法定义时，应用可能尚未启动，宿主来不及导出记录；已有 stderr 诊断仍有必要。
 
-已知 SDK ruleId 通过固定映射分类；未识别的安全拒绝归 POLICY_DENIED。远程检测器的超时、容量、服务故障与实际 remote-denied 拒绝分别分类。普通 TimeoutException/HttpTimeoutException、CancellationException、IOException 有相应分类，其余为 EXECUTION_FAILURE。未知服务端错误不会根据任意消息文本推断为认证失败或协议攻击。
+已知 SDK ruleId 通过固定映射分类；未识别的安全拒绝归 POLICY_DENIED。远程检测器的超时、容量、服务故障与实际 remote-denied 拒绝分别分类。普通 TimeoutException/HttpTimeoutException、CancellationException、IOException 有相应分类，其余为 EXECUTION_FAILURE。未知服务端错误不会根据任意消息文本推断为认证失败或协议攻击。多 Agent 的 `agent-budget-invocations`、`agent-budget-checks` 映射为 CAPACITY_LIMIT，`agent-audit-error` 映射为 AUDIT_FAILURE；只有经 PolicyEngine 等已接入边界传播的异常才自动生成快照。
 
 尚未覆盖所有模型/RAG/memory 的引擎外适配异常、所有 AgentRuntime 生命周期异常、自定义传输内部后台故障、脱离调用上下文的响应读取，以及跨 JVM 聚合。原 MCP 容量指标可记录传输级故障；只有故障到达已接入边界，才形成关联记录。原始失败原因如果已被框架吞掉，不能据此接口恢复。
 

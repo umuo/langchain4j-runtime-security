@@ -125,7 +125,7 @@ public final class PolicyEngine implements AutoCloseable {
     }
 
     private void checkInternal(SecurityEvent event) {
-        Decision decision = DelegationGuard.evaluate(event);
+        Decision decision = DelegationGuard.begin(event);
         long deadline = System.nanoTime() + limits.timeout().toNanos();
         if (executor.isClosed()) {
             decision = Decision.deny("detector-closed");

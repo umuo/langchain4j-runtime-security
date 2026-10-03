@@ -8,6 +8,40 @@ import io.agentsecurity.core.SecurityEvent;
 public final class DelegationGuard {
     private DelegationGuard() {}
 
+    /** 首次入口检查扣减预算；最终放行前的重复授权检查只调用 evaluate。 */
+    public static Decision begin(SecurityEvent event) {
+        var decision = evaluate(event);
+        if (!decision.allowed()
+                || event.context() == null
+                || event.context().invocation() == null) {
+            return decision;
+        }
+        boolean charged =
+                switch (event.phase()) {
+                    case MODEL_INPUT,
+                                    TOOL_INPUT,
+                                    MCP_TOOL_INPUT,
+                                    MCP_RESOURCE_INPUT,
+                                    MCP_PROMPT_INPUT,
+                                    MCP_DISCOVERY_INPUT,
+                                    RETRIEVAL_INPUT,
+                                    AUGMENTATION_INPUT,
+                                    MEMORY_READ_INPUT,
+                                    MEMORY_WRITE,
+                                    MEMORY_DELETE ->
+                            true;
+                    default -> false;
+                };
+        if (charged) {
+            try {
+                event.context().invocation().runtime.consumeProtectedCheck(event.context());
+            } catch (SecurityBlockedException denied) {
+                return Decision.deny(denied.ruleId());
+            }
+        }
+        return decision;
+    }
+
     public static Decision evaluate(SecurityEvent event) {
         var context = event.context();
         if (context == null || context.invocation() == null) {

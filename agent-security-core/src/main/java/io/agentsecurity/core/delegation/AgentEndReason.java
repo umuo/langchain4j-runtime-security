@@ -6,6 +6,7 @@ public enum AgentEndReason {
     FAILED,
     RELEASED,
     CANCELLED,
+    BUDGET_EXHAUSTED,
     EXECUTOR_REJECTED,
     REVOKED,
     PARENT_FINISHED,
