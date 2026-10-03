@@ -6,6 +6,7 @@
     <version>0.1.0-SNAPSHOT</version>
   </parent>
   <artifactId>agent-security-javaagent</artifactId>
+  <name>Agent Security Java Agent</name>
   <dependencies>
     <dependency>
       <groupId>io.github.umuo</groupId>

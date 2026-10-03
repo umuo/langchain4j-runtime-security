@@ -185,6 +185,7 @@ mvn -B -ntp -s .mvn/central-settings.xml -Dmaven.repo.local=.cache/m2 \
 | SNAPSHOT 被拒绝 | 指定非 SNAPSHOT 版本，使用版本准备器 |
 | GPG 签名失败 | ASCII 私钥是否完整、口令是否匹配、密钥是否可签名且有效 |
 | 签名无法验证 | 公钥是否能从受支持服务器获取、是否使用了正确 fingerprint |
+| Project name is missing | 每个发布子模块的原始 POM 必须显式包含 name；本项目已补齐四个运行时模块。拉取修复后重新 Run workflow，重跑旧任务仍使用旧提交 |
 | 缺少 sources／Javadoc | 是否同时启用了 central-artifacts、是否选择全部运行时模块 |
 | 版本已存在 | 改用新版本，不试图覆盖已发布版本 |
 | GitHub workflow 成功但下载 404 | 可能仍是 VALIDATED，尚未手工 Publish；核对 PUBLISHED 状态及下载坐标 |
@@ -201,3 +202,15 @@ mvn -B -ntp -s .mvn/central-settings.xml -Dmaven.repo.local=.cache/m2 \
 从本仓库直接提取的 central-artifacts profile 在独立临时项目中，用一次性受口令保护的测试密钥签名；POM／JAR／sources／Javadoc 共 4 个签名经 OpenPGP 验证有效，测试私钥随后删除，未上传公钥或制品。
 
 以上不表示账号 namespace 已验证、GitHub Secrets／environment 已配置、远端 Actions 已运行，或真实 Central bundle 已通过 Portal 校验。实际部署与冷缓存消费验收仍需按第 2～6 节操作；本轮没有向 Maven Central 上传或公开发布任何 SDK。
+
+## 10. Portal 校验失败后的重新上传
+
+如果日志出现 `Could not find a public key by the key fingerprint`，表示 Central 无法从支持的公钥服务器取得签名公钥，不能据此判定签名数据本身损坏。使用与 GitHub 私钥对应的主密钥完整指纹发布公钥：
+
+```bash
+gpg --keyserver hkps://keyserver.ubuntu.com --send-keys YOUR_FULL_FINGERPRINT
+```
+
+该命令发布公钥及其身份信息，不会发布私钥。公钥可检索后再上传；不要用重新生成密钥的方式解决公钥未发布的问题。若仍失败，核对实际制品签名使用的指纹与发布的公钥一致。[支持的公钥服务器](https://central.sonatype.org/publish/requirements/gpg/)
+
+如果同时需要修改仓库 POM，请在 Actions 中对最新 main 提交重新 **Run workflow**。**Re-run failed jobs** 使用原任务的源码提交，不能取得随后推送的修复。若 0.1.0-alpha.1 尚未成功发布，可继续使用该版本上传新部署；已发布的版本不能覆盖。新的部署通过 VALIDATED 后仍需在 Portal 手动 Publish。
