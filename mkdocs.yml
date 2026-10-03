@@ -68,6 +68,7 @@ nav:
       - Memory 会话安全: memory-security.md
   - 运维与交付:
       - 可观测性与发展规划: observability.md
+      - 结构化故障诊断: failure-diagnostics.md
       - 覆盖与健康诊断: runtime-diagnostics.md
       - 性能诊断基线: performance-baseline.md
       - 恢复与子树验证: recovery-validation.md

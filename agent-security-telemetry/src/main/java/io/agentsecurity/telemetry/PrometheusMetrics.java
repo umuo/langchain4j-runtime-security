@@ -4,6 +4,34 @@ import io.agentsecurity.core.telemetry.SecurityTelemetry;
 
 /** Prometheus text 0.0.4 渲染器；HTTP 端点、认证和访问控制由宿主提供。 */
 public final class PrometheusMetrics {
+    /** 固定分类和阶段标签，不把关联 UUID、规则或版本指纹作为指标标签。 */
+    public static String renderFailures(
+            io.agentsecurity.core.diagnostics.FailureDiagnostics.Snapshot snapshot) {
+        if (snapshot == null) {
+            return "";
+        }
+        var text = new StringBuilder();
+        text.append("# TYPE agent_security_failures_total counter\n");
+        for (var count : snapshot.counts()) {
+            text.append("agent_security_failures_total{category=\"")
+                    .append(count.category().name())
+                    .append("\",stage=\"")
+                    .append(count.stage().name())
+                    .append("\"} ")
+                    .append(count.total())
+                    .append('\n');
+        }
+        text.append("# TYPE agent_security_failure_records_dropped_total counter\n")
+                .append("agent_security_failure_records_dropped_total ")
+                .append(snapshot.dropped())
+                .append('\n');
+        text.append("# TYPE agent_security_failure_records_queued gauge\n")
+                .append("agent_security_failure_records_queued ")
+                .append(snapshot.queued())
+                .append('\n');
+        return text.toString();
+    }
+
     public static final String CONTENT_TYPE = "text/plain; version=0.0.4; charset=utf-8";
     private static final String[] BOUNDS = {"0.001", "0.01", "0.1", "1", "+Inf"};
 

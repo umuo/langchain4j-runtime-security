@@ -16,13 +16,22 @@ public final class McpSyncAdvice {
         return McpBridge.before(source, request);
     }
 
-    @Advice.OnMethodExit
+    @Advice.OnMethodExit(onThrowable = Throwable.class)
     public static void exit(
             @Advice.This Object client,
             @Advice.Argument(0) Object request,
             @Advice.Enter String operation,
             @Advice.Return Object result,
-            @Advice.Local("mcpContext") SecurityContext context) {
+            @Advice.Local("mcpContext") SecurityContext context,
+            @Advice.Thrown Throwable failure) {
+        if (failure != null) {
+            io.agentsecurity.agent.bridge.McpFailureBridge.record(
+                    failure,
+                    "executeTool",
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_EXECUTION,
+                    context);
+            return;
+        }
         try (var scope = SecurityContexts.restore(context)) {
             McpBridge.after(client, request, operation, result);
         }

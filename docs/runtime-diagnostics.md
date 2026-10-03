@@ -108,3 +108,5 @@ HTTP 端点、认证和访问控制仍由宿主负责，Content-Type 使用 `Pro
 ## MCP 容量与分页诊断
 
 `McpDiagnostics.global().snapshot()` 提供固定维度计数，`PrometheusMetrics.renderMcp(snapshot)` 输出独立指标片段。传输首次超限、失效状态检查和分页失败分别计数；缓存命中不增加分页次数。完整配置、语义和验收见 [MCP 分页与指标](mcp-pagination-metrics.md)。
+
+策略最终拒绝与 MCP 引擎外故障的关联队列、固定分类、JSON 编码和指标接入见 [结构化故障诊断](failure-diagnostics.md)。

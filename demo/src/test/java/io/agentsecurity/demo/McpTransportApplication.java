@@ -163,10 +163,14 @@ public final class McpTransportApplication {
                 while (cause.getCause() != null) {
                     cause = cause.getCause();
                 }
-                if (!(cause instanceof SecurityBlockedException denied)) {
+                if (cause instanceof SecurityBlockedException denied) {
+                    rule = denied.ruleId();
+                } else if (scenario.equals("protocol-error")
+                        && failure instanceof RuntimeException) {
+                    rule = "protocol-error";
+                } else {
                     throw new AssertionError("Unexpected transport failure", failure);
                 }
-                rule = denied.ruleId();
             }
             if (scenario.equals("paged-timeout")) {
                 long elapsedMillis = (System.nanoTime() - queryStarted) / 1_000_000;
@@ -231,6 +235,60 @@ public final class McpTransportApplication {
                         && (metrics.pagesAccepted() != 2 || metrics.itemsAccepted() != 2)) {
                     throw new AssertionError("Pagination totals incorrect");
                 }
+            }
+            var failures = io.agentsecurity.core.diagnostics.FailureDiagnostics.global().drain(256);
+            if (rule.equals("protocol-error")) {
+                // 官方无参方法可转调带 InvocationContext 的重载；普通异常按边界记录。
+                int expectedFailures = action.equals("listPrompts") ? 1 : 2;
+                if (failures.size() != expectedFailures
+                        || failures.stream()
+                                .anyMatch(
+                                        item ->
+                                                item.category()
+                                                                != io.agentsecurity.core.diagnostics
+                                                                        .FailureRecord.Category
+                                                                        .EXECUTION_FAILURE
+                                                        || item.stage()
+                                                                != io.agentsecurity.core.diagnostics
+                                                                        .FailureRecord.Stage
+                                                                        .MCP_EXECUTION
+                                                        || item.boundary()
+                                                                != io.agentsecurity.core.diagnostics
+                                                                        .FailureRecord.Boundary
+                                                                        .MCP_DISCOVERY)
+                        || failures.toString().contains("secret-server-failure")) {
+                    throw new AssertionError("Unsafe or missing execution failure record");
+                }
+            } else if (!rule.equals("allow")) {
+                String fingerprint =
+                        io.agentsecurity.core.diagnostics.FailureDiagnostics.fingerprint(rule);
+                var diagnosed =
+                        failures.stream()
+                                .filter(item -> fingerprint.equals(item.ruleFingerprint()))
+                                .toList();
+                if (diagnosed.isEmpty()) {
+                    throw new AssertionError("Missing correlated failure: " + rule);
+                }
+                if (scenario.equals("delegation")
+                        && diagnosed.stream().anyMatch(item -> item.invocationId() == null)) {
+                    throw new AssertionError("Missing delegated invocation identity");
+                }
+                if (scenario.equals("paged-timeout")
+                        && diagnosed.stream()
+                                .anyMatch(
+                                        item ->
+                                                item.category()
+                                                                != io.agentsecurity.core.diagnostics
+                                                                        .FailureRecord.Category
+                                                                        .TIMEOUT
+                                                        || item.stage()
+                                                                != io.agentsecurity.core.diagnostics
+                                                                        .FailureRecord.Stage
+                                                                        .MCP_EXECUTION)) {
+                    throw new AssertionError("Incorrect deadline failure stage");
+                }
+            } else if (!failures.isEmpty()) {
+                throw new AssertionError("Unexpected failure diagnostic");
             }
             long count = Files.exists(journal) ? Files.readAllLines(journal).size() : 0;
             System.out.println("TRANSPORT_RESULT rule=" + rule + " calls=" + count);

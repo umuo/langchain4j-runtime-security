@@ -59,6 +59,16 @@ public final class McpProtocolServer {
         } else {
             Files.writeString(
                     journal, method + "\n", StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            if (scenario.equals("protocol-error")) {
+                return JSON.writeValueAsString(
+                        Map.of(
+                                "jsonrpc",
+                                "2.0",
+                                "id",
+                                input.path("id").asLong(),
+                                "error",
+                                Map.of("code", -32603, "message", "secret-server-failure")));
+            }
             if (scenario.equals("paged-timeout")) {
                 Thread.sleep(800);
             }

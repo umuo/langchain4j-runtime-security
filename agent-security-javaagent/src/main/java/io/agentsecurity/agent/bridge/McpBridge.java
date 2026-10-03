@@ -43,6 +43,32 @@ public final class McpBridge {
     }
 
     public static String before(Object client, Object request) {
+        try {
+            return beforeInternal(client, request);
+        } catch (RuntimeException failure) {
+            McpFailureBridge.record(
+                    failure,
+                    "executeTool",
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_INPUT,
+                    io.agentsecurity.core.SecurityContexts.current());
+            throw failure;
+        }
+    }
+
+    public static void after(Object client, Object request, String operation, Object result) {
+        try {
+            afterInternal(client, request, operation, result);
+        } catch (RuntimeException failure) {
+            McpFailureBridge.record(
+                    failure,
+                    "executeTool",
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_OUTPUT,
+                    io.agentsecurity.core.SecurityContexts.current());
+            throw failure;
+        }
+    }
+
+    private static String beforeInternal(Object client, Object request) {
         Bridge.verifyBoundary(request);
         VERSIONS.get(client.getClass());
         io.agentsecurity.agent.mcp.McpResponseLimits.check(client);
@@ -62,7 +88,8 @@ public final class McpBridge {
         return operation;
     }
 
-    public static void after(Object client, Object request, String operation, Object result) {
+    private static void afterInternal(
+            Object client, Object request, String operation, Object result) {
         io.agentsecurity.agent.mcp.McpResponseLimits.check(client);
         if (result == null) {
             throw new SecurityBlockedException("null-result");
@@ -86,13 +113,35 @@ public final class McpBridge {
             String operation,
             CompletableFuture<?> future,
             SecurityContext context) {
-        return RagBridge.mapFuture(
-                future,
-                context,
-                result -> {
-                    after(client, request, operation, result);
-                    return result;
+        var guarded =
+                RagBridge.mapFuture(
+                        future,
+                        context,
+                        result -> {
+                            after(client, request, operation, result);
+                            return result;
+                        });
+        var observed = new CompletableFuture<Object>();
+        observed.whenComplete(
+                (value, failure) -> {
+                    if (observed.isCancelled()) {
+                        guarded.cancel(true);
+                    }
                 });
+        guarded.whenComplete(
+                (value, failure) -> {
+                    if (failure == null) {
+                        observed.complete(value);
+                    } else {
+                        McpFailureBridge.record(
+                                failure,
+                                "executeToolAsync",
+                                io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_EXECUTION,
+                                context);
+                        observed.completeExceptionally(failure);
+                    }
+                });
+        return observed;
     }
 
     private static String name(Object value) {

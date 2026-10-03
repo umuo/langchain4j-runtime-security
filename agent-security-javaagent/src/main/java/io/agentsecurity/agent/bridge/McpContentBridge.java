@@ -21,6 +21,19 @@ public final class McpContentBridge {
     public record Boundary(String operation, String uri, SecurityContext context) {}
 
     public static Boundary before(Object client, String method, Object[] arguments) {
+        try {
+            return beforeInternal(client, method, arguments);
+        } catch (RuntimeException failure) {
+            McpFailureBridge.record(
+                    failure,
+                    method,
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_INPUT,
+                    SecurityContexts.current());
+            throw failure;
+        }
+    }
+
+    private static Boundary beforeInternal(Object client, String method, Object[] arguments) {
         String server = McpBridge.server(client);
         String target = text(arguments[0]);
         boolean resource = method.equals("readResource");
@@ -65,6 +78,19 @@ public final class McpContentBridge {
     }
 
     public static void after(Object client, Boundary boundary, Object result) {
+        try {
+            afterInternal(client, boundary, result);
+        } catch (RuntimeException failure) {
+            McpFailureBridge.record(
+                    failure,
+                    boundary.uri() == null ? "getPrompt" : "readResource",
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_OUTPUT,
+                    boundary.context());
+            throw failure;
+        }
+    }
+
+    private static void afterInternal(Object client, Boundary boundary, Object result) {
         io.agentsecurity.agent.mcp.McpResponseLimits.check(client);
         boolean resource = boundary.uri() != null;
         shape(result, resource ? "McpReadResourceResult" : "McpGetPromptResult");

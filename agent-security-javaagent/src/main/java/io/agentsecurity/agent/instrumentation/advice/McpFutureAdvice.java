@@ -25,14 +25,23 @@ public final class McpFutureAdvice {
         }
     }
 
-    @Advice.OnMethodExit
+    @Advice.OnMethodExit(onThrowable = Throwable.class)
     public static void exit(
             @Advice.This Object client,
             @Advice.Argument(0) Object request,
             @Advice.Enter Throwable denied,
             @Advice.Local("mcpContext") SecurityContext context,
             @Advice.Local("mcpOperation") String operation,
-            @Advice.Return(readOnly = false, typing = Assigner.Typing.DYNAMIC) Object result) {
+            @Advice.Return(readOnly = false, typing = Assigner.Typing.DYNAMIC) Object result,
+            @Advice.Thrown Throwable failure) {
+        if (failure != null) {
+            io.agentsecurity.agent.bridge.McpFailureBridge.record(
+                    failure,
+                    "executeToolAsync",
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_EXECUTION,
+                    context);
+            return;
+        }
         result =
                 denied != null
                         ? CompletableFuture.failedFuture(denied)

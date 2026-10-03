@@ -184,11 +184,25 @@ public final class PolicyEngine implements AutoCloseable {
         try {
             audit.accept(event, decision);
         } catch (RuntimeException e) {
-            throw new SecurityBlockedException("audit-error");
+            throw diagnosed("audit-error", event, policyVersion);
         }
         if (!decision.allowed()) {
-            throw new SecurityBlockedException(decision.ruleId());
+            throw diagnosed(decision.ruleId(), event, policyVersion);
         }
+    }
+
+    private static SecurityBlockedException diagnosed(
+            String rule, SecurityEvent event, String version) {
+        var failure = new SecurityBlockedException(rule);
+        io.agentsecurity.core.diagnostics.FailureDiagnostics.global()
+                .record(
+                        failure,
+                        io.agentsecurity.core.diagnostics.FailureRecord.Stage.POLICY_EVALUATION,
+                        event.phase(),
+                        event.context(),
+                        event.id(),
+                        version);
+        return failure;
     }
 
     @Override

@@ -15,6 +15,19 @@ public final class McpDiscoveryBridge {
     public record Boundary(String operation, String method, SecurityContext context) {}
 
     public static Boundary before(Object client, String method) {
+        try {
+            return beforeInternal(client, method);
+        } catch (RuntimeException failure) {
+            McpFailureBridge.record(
+                    failure,
+                    method,
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_INPUT,
+                    SecurityContexts.current());
+            throw failure;
+        }
+    }
+
+    private static Boundary beforeInternal(Object client, String method) {
         var boundary =
                 new Boundary(
                         McpOperations.discovery(McpBridge.server(client), method),
@@ -25,6 +38,19 @@ public final class McpDiscoveryBridge {
     }
 
     public static void after(Object client, Boundary boundary, Object result) {
+        try {
+            afterInternal(client, boundary, result);
+        } catch (RuntimeException failure) {
+            McpFailureBridge.record(
+                    failure,
+                    boundary.method(),
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_OUTPUT,
+                    boundary.context());
+            throw failure;
+        }
+    }
+
+    private static void afterInternal(Object client, Boundary boundary, Object result) {
         McpResponseLimits.check(client);
         StringBuilder text = new StringBuilder();
         if (boundary.method().equals("instructions")) {

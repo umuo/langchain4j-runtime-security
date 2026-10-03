@@ -11,11 +11,21 @@ public final class McpDiscoveryAdvice {
         return McpDiscoveryBridge.before(client, method);
     }
 
-    @Advice.OnMethodExit
+    @Advice.OnMethodExit(onThrowable = Throwable.class)
     public static void exit(
             @Advice.This Object client,
             @Advice.Enter McpDiscoveryBridge.Boundary boundary,
-            @Advice.Return Object result) {
-        McpDiscoveryBridge.after(client, boundary, result);
+            @Advice.Return Object result,
+            @Advice.Origin("#m") String method,
+            @Advice.Thrown Throwable failure) {
+        if (failure != null) {
+            io.agentsecurity.agent.bridge.McpFailureBridge.record(
+                    failure,
+                    method,
+                    io.agentsecurity.core.diagnostics.FailureRecord.Stage.MCP_EXECUTION,
+                    boundary.context());
+        } else {
+            McpDiscoveryBridge.after(client, boundary, result);
+        }
     }
 }

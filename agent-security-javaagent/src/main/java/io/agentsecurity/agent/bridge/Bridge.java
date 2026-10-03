@@ -68,6 +68,7 @@ public final class Bridge {
     public static void transformationFailed() {
         transformationFailed = true;
         io.agentsecurity.core.health.AgentCoverage.global().transformationFailed();
+        io.agentsecurity.core.diagnostics.FailureDiagnostics.global().instrumentationFailure();
     }
 
     public static Object guardStream(Object request, Object handler) {
