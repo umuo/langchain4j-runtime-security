@@ -9,6 +9,8 @@ Agent Security 将独立安全 SDK 与 Java Agent 自动插桩结合，在 LangC
 
 ## 从这里开始
 
+第一次使用请先读 [SDK 使用手册](sdk-user-guide.md)，一次看清功能、接入选择、快速运行、配置与扩展步骤。
+
 如果源码暂时看不进去，先看 [图解架构与调用过程](architecture-explained.md)，用工具执行计数理解放行和阻断。
 
 1. 阅读[项目概览与快速运行](overview.md)，运行无 Agent／启用 Agent 的对照演示。
@@ -20,6 +22,7 @@ Agent Security 将独立安全 SDK 与 Java Agent 自动插桩结合，在 LangC
 
 | 场景 | 文档 |
 | --- | --- |
+| SDK 有什么能力、怎么接入、怎样验收 | [SDK 使用手册](sdk-user-guide.md) |
 | 先看架构图，理解检查、执行和结果交付 | [图解框架原理](architecture-explained.md) |
 | 从示例入手，逐步跟踪拦截与检测源码 | [源码学习指南](source-learning.md) |
 | 安全指标、关联记录与导出扩展 | [可观测性与发展规划](observability.md) |

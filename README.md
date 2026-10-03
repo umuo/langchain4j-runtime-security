@@ -4,6 +4,8 @@
 
 当前处于 **固定 LangChain4j 1.20.0 的生产化开发阶段**，尚未达到全部生产验收要求。测试使用真实 LangChain4j AI Services / 工具执行器、官方模型客户端和本机 HTTP/SSE 端点，不调用外部模型、不需要 API key。源码按 Java 17 编译，当前验证运行环境是 JDK 21。完整缺口见 [生产验收清单](docs/production-readiness.md)。
 
+新用户先阅读 [SDK 使用手册](docs/sdk-user-guide.md)：功能总览、接入方式选择、可运行示例、专属策略扩展、预算与取消、配置和排错。
+
 ## 快速运行
 
 在项目根目录执行（需要 Maven 3.6.3+；首次构建访问 Maven Central）：

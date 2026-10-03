@@ -51,6 +51,7 @@ validation:
 nav:
   - 首页: index.md
   - 入门:
+      - SDK 使用手册: sdk-user-guide.md
       - 图解框架原理: architecture-explained.md
       - 项目概览与快速运行: overview.md
   - 安全接入:
