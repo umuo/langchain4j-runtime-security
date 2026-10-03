@@ -43,12 +43,14 @@ final class AgentBootstrap {
         RagBridge.initialize(properties);
         io.agentsecurity.agent.mcp.McpResponseLimits.initialize(properties);
         io.agentsecurity.agent.mcp.McpPagination.initialize(properties);
+        io.agentsecurity.agent.mcp.McpHttpSecurity.initialize(properties);
         MemoryBridge.initialize(properties);
         Properties localProperties = new Properties();
         var streamKeys =
                 java.util.Set.of(
                         "telemetry.enabled",
                         "mcp.max.response.bytes",
+                        "mcp.http.require.bearer",
                         "mcp.pagination.max.pages",
                         "mcp.pagination.timeout.ms",
                         "mcp.pagination.max.items",

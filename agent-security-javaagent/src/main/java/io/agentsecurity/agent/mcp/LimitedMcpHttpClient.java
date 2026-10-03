@@ -15,10 +15,12 @@ import javax.net.ssl.SSLParameters;
 public final class LimitedMcpHttpClient extends HttpClient {
     private final HttpClient delegate;
     private final McpResponseLimits.State state;
+    private final McpHttpSecurity security;
 
-    public LimitedMcpHttpClient(HttpClient delegate, McpResponseLimits.State state) {
+    public LimitedMcpHttpClient(HttpClient delegate, McpResponseLimits.State state, String url) {
         this.delegate = delegate;
         this.state = state;
+        this.security = new McpHttpSecurity(url, delegate, state);
     }
 
     @Override
@@ -69,15 +71,32 @@ public final class LimitedMcpHttpClient extends HttpClient {
     @Override
     public <T> HttpResponse<T> send(HttpRequest request, HttpResponse.BodyHandler<T> handler)
             throws IOException, InterruptedException {
-        state.check();
+        security.check(request);
         return delegate.send(request, limited(handler));
     }
 
     @Override
     public <T> CompletableFuture<HttpResponse<T>> sendAsync(
             HttpRequest request, HttpResponse.BodyHandler<T> handler) {
-        state.check();
-        return delegate.sendAsync(request, limited(handler));
+        security.check(request);
+        var context = io.agentsecurity.core.SecurityContexts.current();
+        var source = delegate.sendAsync(request, limited(handler));
+        var guarded = new CompletableFuture<HttpResponse<T>>();
+        guarded.whenComplete(
+                (value, failure) -> {
+                    if (guarded.isCancelled()) {
+                        source.cancel(true);
+                    }
+                });
+        source.whenComplete(
+                (value, failure) -> {
+                    if (failure == null) {
+                        guarded.complete(value);
+                    } else {
+                        guarded.completeExceptionally(security.transportFailure(failure, context));
+                    }
+                });
+        return guarded;
     }
 
     @Override
@@ -94,7 +113,11 @@ public final class LimitedMcpHttpClient extends HttpClient {
     }
 
     private <T> HttpResponse.BodyHandler<T> limited(HttpResponse.BodyHandler<T> handler) {
-        return info -> new LimitedSubscriber<>(handler.apply(info), state);
+        var context = io.agentsecurity.core.SecurityContexts.current();
+        return info -> {
+            security.response(info.statusCode(), context);
+            return new LimitedSubscriber<>(handler.apply(info), state);
+        };
     }
 
     /** 保持 JDK 17 源码兼容；关闭传输时先终止仍在等待响应头的请求，再关闭客户端。 */

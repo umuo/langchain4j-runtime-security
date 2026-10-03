@@ -21,6 +21,9 @@ public record FailureRecord(
         String ruleFingerprint,
         String policyFingerprint) {
     public enum Category {
+        AUTHENTICATION_FAILURE,
+        SESSION_FAILURE,
+        DESTINATION_FAILURE,
         POLICY_DENIED,
         DETECTOR_FAILURE,
         AUDIT_FAILURE,

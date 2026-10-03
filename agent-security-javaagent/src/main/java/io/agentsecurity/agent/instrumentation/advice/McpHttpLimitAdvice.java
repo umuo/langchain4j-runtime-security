@@ -9,7 +9,8 @@ public final class McpHttpLimitAdvice {
     @Advice.OnMethodExit
     public static void exit(
             @Advice.This Object transport,
-            @Advice.FieldValue(value = "httpClient", readOnly = false) HttpClient client) {
-        client = new LimitedMcpHttpClient(client, McpResponseLimits.state(transport));
+            @Advice.FieldValue(value = "httpClient", readOnly = false) HttpClient client,
+            @Advice.FieldValue("url") String url) {
+        client = new LimitedMcpHttpClient(client, McpResponseLimits.state(transport), url);
     }
 }

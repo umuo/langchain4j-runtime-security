@@ -140,6 +140,15 @@ public final class FailureDiagnostics {
     private static Category category(Throwable error, String rule) {
         if (rule != null) {
             return switch (rule) {
+                case "mcp-http-auth-required",
+                                "mcp-http-auth-failed",
+                                "mcp-http-credential-changed" ->
+                        Category.AUTHENTICATION_FAILURE;
+                case "mcp-http-session-expired" -> Category.SESSION_FAILURE;
+                case "mcp-http-target", "mcp-http-redirect", "mcp-http-redirect-config" ->
+                        Category.DESTINATION_FAILURE;
+                case "mcp-http-unavailable", "mcp-http-transport-failed" ->
+                        Category.TRANSPORT_FAILURE;
                 case "instrumentation-error" -> Category.INSTRUMENTATION_FAILURE;
                 case "audit-error" -> Category.AUDIT_FAILURE;
                 case "detector-timeout", "detector-remote-timeout", "mcp-pagination-timeout" ->

@@ -108,3 +108,5 @@ PolicyEngine 的最终拒绝绑定实际选中的版本快照。即使审计期�
 真实 HTTP JSON、POST SSE、stdio 矩阵中的拒绝场景检查规则指纹与关联数据；分页超时检查 TIMEOUT/MCP_EXECUTION。新增四类目录 × 三种传输的 JSON-RPC 错误场景，验证原异常保留、产生执行阶段诊断、错误文本不被复制。
 
 完整验收运行 `bash scripts/release.sh`，具体测试数量与环境见 [生产验收记录](production-readiness.md)。下一项按计划推进 MCP 认证与连接故障治理，然后是多 Agent 共享预算与任务树取消。
+
+HTTP 认证、目标和会话故障增加固定分类，接入边界见 [MCP HTTP 认证与故障治理](mcp-http-auth-security.md)。

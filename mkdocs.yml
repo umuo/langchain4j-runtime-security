@@ -58,6 +58,7 @@ nav:
       - SDK 扩展与专属策略: sdk-extension.md
       - 远程安全检测客户端: remote-detector.md
       - 策略版本与回滚: policy-versioning.md
+      - MCP HTTP 认证与故障治理: mcp-http-auth-security.md
       - MCP 工具边界: mcp-security.md
       - MCP 资源与提示词: mcp-content-security.md
       - MCP 发现与容量限制: mcp-discovery-limits.md

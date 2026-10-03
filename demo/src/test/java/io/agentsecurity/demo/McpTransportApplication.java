@@ -29,6 +29,8 @@ public final class McpTransportApplication {
         String scenario = args[2];
         Path journal = Path.of(args[3]);
         HttpServer http = null;
+        var initializations = new java.util.concurrent.atomic.AtomicInteger();
+        var redirects = new java.util.concurrent.atomic.AtomicInteger();
         McpTransport transport;
         if (mode.equals("stdio")) {
             transport =
@@ -58,6 +60,55 @@ public final class McpTransportApplication {
                                     new String(
                                             exchange.getRequestBody().readNBytes(65536),
                                             StandardCharsets.UTF_8);
+                            String rpcMethod =
+                                    new com.fasterxml.jackson.databind.ObjectMapper()
+                                            .readTree(request)
+                                            .path("method")
+                                            .asText();
+                            if (rpcMethod.equals("initialize")) {
+                                initializations.incrementAndGet();
+                            }
+                            if (scenario.startsWith("auth-")) {
+                                if (!"Bearer fixture-token"
+                                        .equals(
+                                                exchange.getRequestHeaders()
+                                                        .getFirst("Authorization"))) {
+                                    throw new AssertionError("Incorrect request credentials");
+                                }
+                                if (rpcMethod.equals("tools/list")
+                                        && scenario.equals("auth-disconnect")) {
+                                    Files.writeString(
+                                            journal,
+                                            rpcMethod + "\n",
+                                            java.nio.file.StandardOpenOption.CREATE,
+                                            java.nio.file.StandardOpenOption.APPEND);
+                                    exchange.sendResponseHeaders(200, 100);
+                                    exchange.close();
+                                    return;
+                                }
+                                int status =
+                                        switch (scenario) {
+                                            case "auth-401" -> 401;
+                                            case "auth-403" -> 403;
+                                            case "auth-404" -> 404;
+                                            case "auth-503" -> 503;
+                                            case "auth-redirect" -> 307;
+                                            default -> 200;
+                                        };
+                                if (rpcMethod.equals("tools/list") && status != 200) {
+                                    Files.writeString(
+                                            journal,
+                                            rpcMethod + "\n",
+                                            java.nio.file.StandardOpenOption.CREATE,
+                                            java.nio.file.StandardOpenOption.APPEND);
+                                    if (status == 307) {
+                                        exchange.getResponseHeaders()
+                                                .set("Location", "/redirect-target");
+                                    }
+                                    exchange.sendResponseHeaders(status, -1);
+                                    return;
+                                }
+                            }
                             String reply = server.reply(request);
                             if (reply == null) {
                                 exchange.sendResponseHeaders(202, -1);
@@ -80,9 +131,36 @@ public final class McpTransportApplication {
                             throw new java.io.IOException(error);
                         }
                     });
+            http.createContext(
+                    "/redirect-target",
+                    exchange -> {
+                        redirects.incrementAndGet();
+                        exchange.sendResponseHeaders(200, -1);
+                        exchange.close();
+                    });
             http.start();
+            var credentialCalls = new java.util.concurrent.atomic.AtomicInteger();
             transport =
                     new StreamableHttpMcpTransport.Builder()
+                            .customHeaders(
+                                    () -> {
+                                        if (!scenario.startsWith("auth-")) {
+                                            return Map.of();
+                                        }
+                                        int request = credentialCalls.incrementAndGet();
+                                        if (request > 2 && scenario.equals("auth-missing")) {
+                                            return Map.of();
+                                        }
+                                        String token =
+                                                request > 2 && scenario.equals("auth-rotate")
+                                                        ? "Bearer changed-token"
+                                                        : request > 2
+                                                                        && scenario.equals(
+                                                                                "auth-malformed")
+                                                                ? "Basic invalid"
+                                                                : "Bearer fixture-token";
+                                        return Map.of("Authorization", token);
+                                    })
                             .url("http://127.0.0.1:" + http.getAddress().getPort() + "/mcp")
                             .timeout(Duration.ofSeconds(5))
                             .build();
@@ -203,6 +281,20 @@ public final class McpTransportApplication {
                         throw denied;
                     }
                 }
+            }
+            if (scenario.startsWith("auth-") && !rule.equals("allow")) {
+                try {
+                    operation.call();
+                    throw new AssertionError("Failed HTTP client reused");
+                } catch (SecurityBlockedException expected) {
+                    if (!expected.ruleId().equals(rule)) {
+                        throw expected;
+                    }
+                }
+            }
+            if (scenario.startsWith("auth-")
+                    && (initializations.get() != 1 || redirects.get() != 0)) {
+                throw new AssertionError("Unexpected reinitialization or credential redirect");
             }
             var metrics = io.agentsecurity.core.health.McpDiagnostics.global().snapshot();
             if (scenario.equals("wire")) {

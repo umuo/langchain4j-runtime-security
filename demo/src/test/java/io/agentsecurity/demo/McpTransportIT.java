@@ -22,78 +22,106 @@ class McpTransportIT {
     }
 
     static Stream<Arguments> scenarios() {
-        return Stream.of("http", "sse", "stdio")
-                .flatMap(
-                        mode ->
-                                List.of(
-                                                "resource,allow,allow,1",
-                                                "resource,default,mcp-resource-not-allowed,0",
-                                                "resource,server,mcp-resource-not-allowed,0",
-                                                "resource,target,mcp-resource-not-allowed,0",
-                                                "resource,output,denied-text,1",
-                                                "resource,uri,mcp-resource-uri-mismatch,1",
-                                                "resource,binary,unsupported-mcp-content,1",
-                                                "resource,limit,mcp-content-limit,1",
-                                                "resource,delegation,agent-tool-denied,0",
-                                                "prompt,allow,allow,1",
-                                                "prompt,default,mcp-prompt-not-allowed,0",
-                                                "prompt,server,mcp-prompt-not-allowed,0",
-                                                "prompt,target,mcp-prompt-not-allowed,0",
-                                                "prompt,input,denied-text,0",
-                                                "prompt,output,denied-text,1",
-                                                "prompt,description,denied-text,1",
-                                                "prompt,binary,unsupported-mcp-content,1",
-                                                "prompt,limit,mcp-content-limit,1",
-                                                "prompt,delegation,agent-tool-denied,0",
-                                                "tool,allow,allow,1",
-                                                "tool,default,mcp-tool-not-allowed,0",
-                                                "tool,output,denied-text,1",
-                                                "listTools,allow,allow,1",
-                                                "listTools,protocol-error,protocol-error,1",
-                                                "listResources,protocol-error,protocol-error,1",
-                                                "listResourceTemplates,protocol-error,protocol-error,1",
-                                                "listPrompts,protocol-error,protocol-error,1",
-                                                "listTools,default,mcp-discovery-not-allowed,0",
-                                                "listResources,allow,allow,1",
-                                                "listResources,default,mcp-discovery-not-allowed,0",
-                                                "listResourceTemplates,allow,allow,1",
-                                                "listResourceTemplates,default,mcp-discovery-not-allowed,0",
-                                                "listPrompts,allow,allow,1",
-                                                "listPrompts,default,mcp-discovery-not-allowed,0",
-                                                "instructions,allow,allow,0",
-                                                "instructions,default,mcp-discovery-not-allowed,0",
-                                                "instructions,output,denied-text,0",
-                                                "listTools,schema,denied-text,1",
-                                                "listPrompts,schema,denied-text,1",
-                                                "listResources,metadata,mcp-discovery-metadata-unsupported,1",
-                                                "listTools,limit,mcp-pagination-items,1",
-                                                "listTools,cached,agent-tool-denied,1",
-                                                "tool,wire,mcp-response-limit,1",
-                                                "listTools,paged-ok,allow,2",
-                                                "listTools,paged-timeout,mcp-pagination-timeout,2",
-                                                "listResources,paged-timeout,mcp-pagination-timeout,2",
-                                                "listResourceTemplates,paged-timeout,mcp-pagination-timeout,2",
-                                                "listPrompts,paged-timeout,mcp-pagination-timeout,2",
-                                                "listResources,paged-ok,allow,2",
-                                                "listResourceTemplates,paged-ok,allow,2",
-                                                "listPrompts,paged-ok,allow,2",
-                                                "listTools,paged-pages,mcp-pagination-pages,4",
-                                                "listTools,paged-items,mcp-pagination-items,2",
-                                                "listTools,paged-bytes,mcp-pagination-bytes,2",
-                                                "listTools,paged-cursor,mcp-pagination-cursor,2",
-                                                "listTools,paged-long-cursor,mcp-pagination-cursor,1",
-                                                "listTools,paged-empty,mcp-pagination-pages,2")
-                                        .stream()
-                                        .map(
-                                                value -> {
-                                                    var fields = value.split(",");
-                                                    return Arguments.of(
-                                                            mode,
-                                                            fields[0],
-                                                            fields[1],
-                                                            fields[2],
-                                                            Integer.parseInt(fields[3]));
-                                                }));
+        var baseline =
+                Stream.of("http", "sse", "stdio")
+                        .flatMap(
+                                mode ->
+                                        List.of(
+                                                        "resource,allow,allow,1",
+                                                        "resource,default,mcp-resource-not-allowed,0",
+                                                        "resource,server,mcp-resource-not-allowed,0",
+                                                        "resource,target,mcp-resource-not-allowed,0",
+                                                        "resource,output,denied-text,1",
+                                                        "resource,uri,mcp-resource-uri-mismatch,1",
+                                                        "resource,binary,unsupported-mcp-content,1",
+                                                        "resource,limit,mcp-content-limit,1",
+                                                        "resource,delegation,agent-tool-denied,0",
+                                                        "prompt,allow,allow,1",
+                                                        "prompt,default,mcp-prompt-not-allowed,0",
+                                                        "prompt,server,mcp-prompt-not-allowed,0",
+                                                        "prompt,target,mcp-prompt-not-allowed,0",
+                                                        "prompt,input,denied-text,0",
+                                                        "prompt,output,denied-text,1",
+                                                        "prompt,description,denied-text,1",
+                                                        "prompt,binary,unsupported-mcp-content,1",
+                                                        "prompt,limit,mcp-content-limit,1",
+                                                        "prompt,delegation,agent-tool-denied,0",
+                                                        "tool,allow,allow,1",
+                                                        "tool,default,mcp-tool-not-allowed,0",
+                                                        "tool,output,denied-text,1",
+                                                        "listTools,allow,allow,1",
+                                                        "listTools,protocol-error,protocol-error,1",
+                                                        "listResources,protocol-error,protocol-error,1",
+                                                        "listResourceTemplates,protocol-error,protocol-error,1",
+                                                        "listPrompts,protocol-error,protocol-error,1",
+                                                        "listTools,default,mcp-discovery-not-allowed,0",
+                                                        "listResources,allow,allow,1",
+                                                        "listResources,default,mcp-discovery-not-allowed,0",
+                                                        "listResourceTemplates,allow,allow,1",
+                                                        "listResourceTemplates,default,mcp-discovery-not-allowed,0",
+                                                        "listPrompts,allow,allow,1",
+                                                        "listPrompts,default,mcp-discovery-not-allowed,0",
+                                                        "instructions,allow,allow,0",
+                                                        "instructions,default,mcp-discovery-not-allowed,0",
+                                                        "instructions,output,denied-text,0",
+                                                        "listTools,schema,denied-text,1",
+                                                        "listPrompts,schema,denied-text,1",
+                                                        "listResources,metadata,mcp-discovery-metadata-unsupported,1",
+                                                        "listTools,limit,mcp-pagination-items,1",
+                                                        "listTools,cached,agent-tool-denied,1",
+                                                        "tool,wire,mcp-response-limit,1",
+                                                        "listTools,paged-ok,allow,2",
+                                                        "listTools,paged-timeout,mcp-pagination-timeout,2",
+                                                        "listResources,paged-timeout,mcp-pagination-timeout,2",
+                                                        "listResourceTemplates,paged-timeout,mcp-pagination-timeout,2",
+                                                        "listPrompts,paged-timeout,mcp-pagination-timeout,2",
+                                                        "listResources,paged-ok,allow,2",
+                                                        "listResourceTemplates,paged-ok,allow,2",
+                                                        "listPrompts,paged-ok,allow,2",
+                                                        "listTools,paged-pages,mcp-pagination-pages,4",
+                                                        "listTools,paged-items,mcp-pagination-items,2",
+                                                        "listTools,paged-bytes,mcp-pagination-bytes,2",
+                                                        "listTools,paged-cursor,mcp-pagination-cursor,2",
+                                                        "listTools,paged-long-cursor,mcp-pagination-cursor,1",
+                                                        "listTools,paged-empty,mcp-pagination-pages,2")
+                                                .stream()
+                                                .map(
+                                                        value -> {
+                                                            var fields = value.split(",");
+                                                            return Arguments.of(
+                                                                    mode,
+                                                                    fields[0],
+                                                                    fields[1],
+                                                                    fields[2],
+                                                                    Integer.parseInt(fields[3]));
+                                                        }));
+        var auth =
+                Stream.of("http", "sse")
+                        .flatMap(
+                                mode ->
+                                        List.of(
+                                                        "auth-ok,allow,1",
+                                                        "auth-disconnect,mcp-http-transport-failed,1",
+                                                        "auth-401,mcp-http-auth-failed,1",
+                                                        "auth-403,mcp-http-auth-failed,1",
+                                                        "auth-404,mcp-http-session-expired,1",
+                                                        "auth-503,mcp-http-unavailable,1",
+                                                        "auth-redirect,mcp-http-redirect,1",
+                                                        "auth-missing,mcp-http-auth-required,0",
+                                                        "auth-rotate,mcp-http-credential-changed,0",
+                                                        "auth-malformed,mcp-http-auth-required,0")
+                                                .stream()
+                                                .map(
+                                                        value -> {
+                                                            var fields = value.split(",");
+                                                            return Arguments.of(
+                                                                    mode,
+                                                                    "listTools",
+                                                                    fields[0],
+                                                                    fields[1],
+                                                                    Integer.parseInt(fields[2]));
+                                                        }));
+        return Stream.concat(baseline, auth);
     }
 
     @ParameterizedTest(name = "{0} {1} {2}")
@@ -121,6 +149,9 @@ class McpTransportIT {
                             .collect(java.util.stream.Collectors.joining(",")));
         }
         properties.setProperty("deny.text", "secret-marker");
+        if (scenario.startsWith("auth-")) {
+            properties.setProperty("mcp.http.require.bearer", "true");
+        }
         if (scenario.equals("wire")) {
             properties.setProperty("mcp.max.response.bytes", "1024");
         }

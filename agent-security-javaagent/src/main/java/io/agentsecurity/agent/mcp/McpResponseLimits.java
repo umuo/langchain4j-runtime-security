@@ -10,7 +10,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.Properties;
 import java.util.WeakHashMap;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 /** 固定传输的响应容量状态。超限后保持不可用，必须由宿主重建客户端。 */
 public final class McpResponseLimits {
@@ -69,7 +69,7 @@ public final class McpResponseLimits {
 
     public static final class State {
         final int maxBytes;
-        private final AtomicBoolean failed = new AtomicBoolean();
+        private final AtomicReference<String> failed = new AtomicReference<>();
         private final McpDiagnostics diagnostics;
 
         public State(int maxBytes) {
@@ -82,14 +82,32 @@ public final class McpResponseLimits {
         }
 
         public void check() {
-            if (failed.get()) {
+            if (failed.get() != null) {
                 diagnostics.failedStateChecked();
-                throw new SecurityBlockedException("mcp-response-limit");
+                throw new SecurityBlockedException(failed.get());
             }
         }
 
+        /** HTTP 认证/目标/会话故障保持失效，不计为容量超限。 */
+        public SecurityBlockedException invalidate(String rule) {
+            if (!java.util.Set.of(
+                            "mcp-http-target",
+                            "mcp-http-auth-required",
+                            "mcp-http-auth-failed",
+                            "mcp-http-credential-changed",
+                            "mcp-http-session-expired",
+                            "mcp-http-redirect",
+                            "mcp-http-unavailable",
+                            "mcp-http-transport-failed")
+                    .contains(rule)) {
+                throw new IllegalArgumentException("Invalid MCP transport failure");
+            }
+            failed.compareAndSet(null, rule);
+            return new SecurityBlockedException(failed.get());
+        }
+
         SecurityBlockedException reject(Limit reason) {
-            if (failed.compareAndSet(false, true)) {
+            if (failed.compareAndSet(null, "mcp-response-limit")) {
                 diagnostics.limit(reason);
                 diagnostics.transportFailed();
             }
