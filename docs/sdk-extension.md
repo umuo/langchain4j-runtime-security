@@ -81,7 +81,7 @@ order-agent-security/
   </properties>
   <dependencies>
     <dependency>
-      <groupId>io.agentsecurity</groupId>
+      <groupId>io.github.umuo</groupId>
       <artifactId>agent-security-core</artifactId>
       <version>0.1.0-SNAPSHOT</version>
     </dependency>

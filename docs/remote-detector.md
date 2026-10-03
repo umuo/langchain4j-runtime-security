@@ -8,7 +8,7 @@
 
 ```xml
 <dependency>
-  <groupId>io.agentsecurity</groupId>
+  <groupId>io.github.umuo</groupId>
   <artifactId>agent-security-policy</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>

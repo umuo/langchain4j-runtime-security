@@ -40,3 +40,8 @@ CI 配置尚未在远端执行；本地当前仅验证 JDK 21.0.2，不能据配
 2026-09-27 06:28（Asia/Shanghai）通过 OSV querybatch 核对当前两个第三方运行时依赖：Byte Buddy 1.17.8 与 Jackson Core 2.22.1，响应均无已知漏洞条目。原始请求坐标、响应和时间保存在 [查询证据](evidence/runtime-dependencies-2026-09-27.json)。这是该数据库在查询时的已知记录，不是无漏洞证明；未覆盖构建插件、CI Actions、JDK 或业务应用的 LangChain4j／provider 依赖，也尚未接入自动发布阻断。
 
 仍需远端 CI 实际通过、依赖漏洞扫描及处置记录、许可证审查、发布签名与来源证明、跨环境构建比对、性能／压力数据和真实业务灰度。不要把 SBOM、固定 SHA 或一次本地重建当成已经完成供应链审计。当前版本保持 SNAPSHOT，完整验收状态见 [清单](production-readiness.md)。
+
+
+## Maven Central
+
+本页的 release 流程生成本地验收包，不执行远程发布。Maven Central 使用独立的 central-artifacts／central-upload profiles 与手动触发的 GitHub Actions；新坐标为 io.github.umuo，账号与操作步骤见 [Central 发布手册](maven-central-publishing.md)。

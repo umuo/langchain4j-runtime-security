@@ -78,6 +78,7 @@ nav:
       - Collector 与 TLS 验收: collector-acceptance.md
       - 运行与故障恢复: operations.md
       - 构建与发布工程: release-engineering.md
+      - Maven Central 发布: maven-central-publishing.md
       - 生产验收清单: production-readiness.md
   - 设计与维护:
       - 源码学习路线: source-learning.md

@@ -169,3 +169,10 @@ policy 模块新增 RemoteHttpDetector，提供固定可信端点、显式内容
 
 
 2026-10-03，最终完整 `scripts/release.sh` 通过 **634 项测试，零失败、零错误、零跳过**（core 89、policy 87、telemetry 18、Agent 85、普通 Java 267、Boot 88）。新增 10 项共享预算与取消测试；现有撤销和完成竞态用例按新的结果拒绝语义更新。首次完整验证暴露旧用例仍要求撤销后成功返回，修正断言后最终矩阵全部通过；复核时补入父委托复检，停止旧版本验收后重新执行最终版本。191 项真实 MCP 传输场景及 20 项冷启动回归保持通过，4 个运行时 JAR 隔离重建 SHA-256 一致，发布包包含 SBOM、测试报告及校验和，Wiki 严格构建通过。环境为 macOS arm64 / JDK 21.0.4；本轮预算行为通过 core 并发测试验收，未新增真实 LangChain4j 预算场景，不代表远端 CI、跨服务预算或长期压力已经验收。
+
+
+## Maven Central 发布准备与坐标迁移
+
+2026-10-03，Maven groupId 迁移为 `io.github.umuo`，Java 包名保持不变，使用 MIT 许可证。补充源码／Javadoc／GPG profile、SNAPSHOT 上传拒绝、版本准备器和手动 Central 工作流；demo／Boot 仅验收，不进入发布范围。完整发布验收仍为 **634 项测试通过、零失败／错误／跳过**，4 个运行时 JAR 隔离重建一致；版本准备器等 Python 测试 14 项通过。源码／Javadoc 打包、发布版本本地 validate 和一次性密钥四制品签名验证通过。Wiki 严格构建通过。
+
+真实 namespace 权限、Secrets、GitHub Actions、Central 上传校验和公开下载尚未验收，不应把发布准备当作已发布。具体操作与本轮证据见 [Maven Central 发布](maven-central-publishing.md)。

@@ -66,12 +66,12 @@ flowchart LR
 
 | 制品 | 使用场景 |
 | --- | --- |
-| `io.agentsecurity:agent-security-core` | 事件、引擎、上下文、Detector、委托、预算、审计和基础收集 |
-| `io.agentsecurity:agent-security-policy` | 严格工具参数策略、远程 HTTP Detector、策略编译；依赖 core |
-| `io.agentsecurity:agent-security-telemetry` | Prometheus 文本及 OTLP/HTTP 日志导出；可选 |
+| `io.github.umuo:agent-security-core` | 事件、引擎、上下文、Detector、委托、预算、审计和基础收集 |
+| `io.github.umuo:agent-security-policy` | 严格工具参数策略、远程 HTTP Detector、策略编译；依赖 core |
+| `io.github.umuo:agent-security-telemetry` | Prometheus 文本及 OTLP/HTTP 日志导出；可选 |
 | `agent-security-javaagent.jar` | JVM 启动加载的自动拦截制品，独立放到部署目录 |
 
-本手册不假设制品已发布到 Maven Central。先从源码构建、安装到本地仓库，团队再按需发布私有仓库。
+Maven 坐标已迁移为 io.github.umuo，Java 包名不变。本手册不假设制品已发布到 Maven Central；当前 SNAPSHOT 可先从源码构建、安装到本地仓库。公开制品发布与 release 版本引用见 [Central 发布手册](maven-central-publishing.md)。
 
 ## 4. 十分钟跑通：先观察实际阻断
 
@@ -196,7 +196,7 @@ mvn -B -ntp -s .mvn/settings.xml -Dmaven.repo.local="$AGENT_SECURITY_M2" \
 
 ```xml
 <dependency>
-  <groupId>io.agentsecurity</groupId>
+  <groupId>io.github.umuo</groupId>
   <artifactId>agent-security-core</artifactId>
   <version>0.1.0-SNAPSHOT</version>
 </dependency>

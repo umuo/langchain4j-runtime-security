@@ -6,7 +6,7 @@
 
 ## 认证入口
 
-业务应用依赖与 Agent 同一构建版本的 `io.agentsecurity:agent-security-core:0.1.0-SNAPSHOT`。在应用完成认证和权限查询后，为每次业务 run 创建上下文：
+业务应用依赖与 Agent 同一构建版本的 `io.github.umuo:agent-security-core:0.1.0-SNAPSHOT`。在应用完成认证和权限查询后，为每次业务 run 创建上下文：
 
 ```java
 import io.agentsecurity.core.SecurityContext;

@@ -103,6 +103,7 @@ def main():
     shutil.copytree(ROOT / "docs", destination / "docs")
     shutil.copytree(ROOT / "config", destination / "config")
     shutil.copy2(ROOT / "README.md", destination / "README.md")
+    shutil.copy2(ROOT / "LICENSE", destination / "LICENSE")
     build = {"version": VERSION, "status": "production-acceptance-incomplete", "tests": counts,
              "runtimeJarSha256": hashes, "runtimeJarsReproduced": True,
              "reproducibilityScope": "same JDK/Maven, isolated source directory; runtime jars only",

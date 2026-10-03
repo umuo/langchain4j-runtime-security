@@ -1,0 +1,108 @@
+name: Upload SDK to Maven Central
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version, for example 0.1.0-alpha.1'
+        required: true
+        type: string
+      namespace_verified:
+        description: 'I verified io.github.umuo in Central Portal'
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-central
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.ref == 'refs/heads/main' && inputs.namespace_verified
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare exact release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python3 scripts/prepare_central_release.py --version "$RELEASE_VERSION"
+      - name: Verify release and test publishing helpers
+        run: |
+          python3 -m unittest discover -s scripts -p 'test_prepare_central_release.py'
+          bash scripts/release.sh
+      - name: Generate sources and API documentation without signing
+        run: >-
+          mvn -B -ntp -s .mvn/settings.xml -Dmaven.repo.local=.cache/m2
+          -pl agent-security-core,agent-security-policy,agent-security-telemetry,agent-security-javaagent -am
+          -Pcentral-artifacts -DskipTests -Dgpg.skip=true package
+      - name: Preserve release evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: central-release-evidence
+          retention-days: 14
+          path: |
+            target/release/**
+            **/target/*-sources.jar
+            **/target/*-javadoc.jar
+
+  upload:
+    needs: verify
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    # 在仓库设置中创建此 environment，并按需设置 required reviewers。
+    environment: maven-central
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Prepare the same source revision and release version
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: python3 scripts/prepare_central_release.py --version "$RELEASE_VERSION"
+      - name: Check required publishing secrets
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          for variable in CENTRAL_USERNAME CENTRAL_PASSWORD MAVEN_GPG_KEY MAVEN_GPG_PASSPHRASE; do
+            if [[ -z "${!variable}" ]]; then
+              echo "Missing publishing secret: $variable" >&2
+              exit 1
+            fi
+          done
+      - name: Sign and upload for manual publication
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          MAVEN_GPG_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: >-
+          mvn -B -ntp -s .mvn/central-settings.xml -Dmaven.repo.local=.cache/m2
+          -pl agent-security-core,agent-security-policy,agent-security-telemetry,agent-security-javaagent -am
+          -Pcentral-artifacts,central-upload -DskipTests clean deploy
+      - name: Explain next step
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          echo "Source commit: $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Release version: $RELEASE_VERSION" >> "$GITHUB_STEP_SUMMARY"
+          echo 'Upload validated. Open https://central.sonatype.com/publishing/deployments and review before publishing.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'autoPublish=false: this workflow does not make the SDK publicly available by itself.' >> "$GITHUB_STEP_SUMMARY"

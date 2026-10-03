@@ -109,7 +109,7 @@ var runtime = new AgentRuntime(definitions, limits, auditSink, telemetry);
 
 ## 可选导出模块
 
-新增 `io.agentsecurity:agent-security-telemetry:0.1.0-SNAPSHOT`，依赖 core 与 Jackson Core，网络请求使用 JDK HttpClient。它不被打包进 Java Agent，也不通过策略文件自动开启网络请求；宿主显式添加依赖和创建导出器。构建本地依赖可执行 `mvn -s .mvn/settings.xml -Dmaven.repo.local=.cache/m2 -pl agent-security-telemetry -am install`。
+新增 `io.github.umuo:agent-security-telemetry:0.1.0-SNAPSHOT`，依赖 core 与 Jackson Core，网络请求使用 JDK HttpClient。它不被打包进 Java Agent，也不通过策略文件自动开启网络请求；宿主显式添加依赖和创建导出器。构建本地依赖可执行 `mvn -s .mvn/settings.xml -Dmaven.repo.local=.cache/m2 -pl agent-security-telemetry -am install`。
 
 ### OTLP/HTTP 日志
 

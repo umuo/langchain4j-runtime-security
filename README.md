@@ -265,3 +265,8 @@ mkdocs serve
 ## 可观测性
 
 提供不依赖 Spring 的固定维度指标、耗时分桶和有界父子执行关联队列。Java Agent 可设置 `telemetry.enabled=true`，业务通过 `SecurityTelemetry.global()` 拉取；独立 SDK 可显式传入收集器。默认关闭，队列满不影响安全决策。可选 `agent-security-telemetry` 模块提供 Prometheus 文本及 OTLP/HTTP 日志导出，不要求 Spring。接入、限制和后续路线见 [可观测性指南](docs/observability.md)。
+
+
+## Maven Central 发布准备
+
+Maven 坐标已迁移为 `io.github.umuo`，Java 包名不变，项目使用 MIT 许可证。当前开发版本仍为 `0.1.0-SNAPSHOT`，不代表已发布到 Central。账号验证、GPG／Token、GitHub Secrets、上传与引用步骤见 [Maven Central 发布手册](docs/maven-central-publishing.md)。

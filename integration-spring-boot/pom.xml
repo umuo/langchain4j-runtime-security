@@ -1,7 +1,7 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0">
   <modelVersion>4.0.0</modelVersion>
   <parent>
-    <groupId>io.agentsecurity</groupId>
+    <groupId>io.github.umuo</groupId>
     <artifactId>agent-security-parent</artifactId>
     <version>0.1.0-SNAPSHOT</version>
   </parent>
@@ -19,7 +19,7 @@
   </dependencyManagement>
   <dependencies>
     <dependency>
-      <groupId>io.agentsecurity</groupId>
+      <groupId>io.github.umuo</groupId>
       <artifactId>agent-security-policy</artifactId>
       <version>${project.version}</version>
     </dependency>
@@ -38,7 +38,7 @@
       <version>${langchain4j.version}</version>
     </dependency>
     <dependency>
-      <groupId>io.agentsecurity</groupId>
+      <groupId>io.github.umuo</groupId>
       <artifactId>agent-security-core</artifactId>
       <version>${project.version}</version>
     </dependency>
