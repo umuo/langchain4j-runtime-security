@@ -276,3 +276,5 @@ Maven 坐标已迁移为 `io.github.umuo`，Java 包名不变，项目使用 MIT
 最新源码支持仅指定 `-javaagent:/path/agent-security-javaagent.jar` 而不传策略路径：启动入口直接返回，不安装 transformer、不创建检测／审计线程，保留应用原始调用和流式输出路径。仅有 JVM 加载 Agent 的一次性启动开销。空白参数同样处理；传入空配置文件仍启用默认策略，显式无效的文件路径或配置仍导致启动失败。此行为需使用包含本次变更的新构建，已发布的 `0.1.0-alpha.1` 不变。
 
 最小安全接入配置见 [config/minimal.properties](config/minimal.properties)；全部配置及中文说明见 [部署示例](config/deployment-example.properties)。性能开销和本地文件说明见 [SDK 使用手册](docs/sdk-user-guide.md)。
+
+最新源码的 `max.text.chars` 未配置或空值时不限制文本长度；填写正整数时限制单次检查提取、拼接后的文本总长度。流式缓冲和工具参数等独立资源限制仍生效，详情见 [文本长度说明](docs/sdk-user-guide.md)。已发布的旧版本不自动改变行为。

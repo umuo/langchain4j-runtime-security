@@ -247,7 +247,7 @@ public final class Bridge {
         if (text.isEmpty()) {
             return;
         }
-        if (text.length() > maxTextChars - target.length() - 1) {
+        if (maxTextChars > 0 && text.length() > maxTextChars - target.length() - 1) {
             throw new SecurityBlockedException("text-limit");
         }
         target.append(text).append('\n');

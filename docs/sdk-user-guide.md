@@ -380,7 +380,7 @@ public final class AgentTreeQuickStart {
 
 | 配置组 | 常用键 | 初次接入建议 |
 | --- | --- | --- |
-| 文本／工具 | `allow.tools`、`deny.tools`、`deny.text`、`max.text.chars` | 先显式允许必要工具；文本上限默认 100000 UTF-16 单元 |
+| 文本／工具 | `allow.tools`、`deny.tools`、`deny.text`、`max.text.chars` | 先显式允许必要工具；文本长度默认不限制；填写正整数时按每次检查的累计 UTF-16 单元限制 |
 | 工具 JSON | `tool.policy.path` | 相对主配置所在目录；只定义必要工具 |
 | 身份 | `context.required` | 默认 false；完成可信入口接入后设 true |
 | 检索 | `allow.retrievers`、`rag.max.contents`、`rag.max.metadata.entries` | 逐检索器验证，别把组件白名单当数据 ACL |
@@ -397,7 +397,24 @@ public final class AgentTreeQuickStart {
 
 检测、审计、流式和分页预算是不同层的预算，不是统一业务请求的硬返回期限。多个边界分别检查，不响应中断的插件／业务 I/O 可能仍在运行。
 
-### 9.1 最小运行配置
+### 9.1 文本长度上限的准确含义
+
+`max.text.chars` 限制**单次安全检查提取、拼接后的文本总长度**。模型输入按本次消息集合累计，包含系统提示词、用户消息和历史消息；模型输出包括已适配正文、thinking 和工具调用信息。工具输入按参数 JSON 文本、工具输出按返回文本，RAG／Memory／MCP 按对应边界提取的文本累计。拼接换行计入长度。
+
+单位是 Java UTF-16 单元，常见汉字通常为 1，部分 emoji 为 2；不是 token 数、字节数、每条消息独立额度或整个会话累计预算。显式设置上限后，超限拒绝，不自动截断。
+
+最新源码中，未配置、`max.text.chars=` 或纯空白值均表示**不限制文本长度**，不再使用 100000 默认值。显式值必须是 1～10000000 的正整数；0、负数、非整数和超出范围仍是配置错误。文本禁止规则仍然执行。该行为需使用包含本次变更的新构建，已发布的 `0.1.0-alpha.1` 保持原行为。
+
+```properties
+# 不限制本次检查文本长度。
+max.text.chars=
+# 如果需要限制，改为下面的正整数配置，而不是同时写两行。
+# max.text.chars=100000
+```
+
+它不会关闭独立的 `stream.max.chars`（默认 100000）、工具 JSON 的 `maxArgumentChars`、MCP 字节上限或 RAG／Memory 数量限制。不设置上限也不表示检测不需要内存：文本仍需提取、拼接和扫描，成本随内容增大。
+
+### 9.2 最小运行配置
 
 普通模型和普通工具的最小安全接入，可以直接使用 [minimal.properties](../config/minimal.properties)。不需要额外 JSON 策略、身份接入或文件审计：
 
@@ -405,7 +422,7 @@ public final class AgentTreeQuickStart {
 policy.version=minimal-v1
 deny.tools=sendEmail,deleteAll
 deny.text=IGNORE_SECURITY_TEST,DEMO_SECRET_123
-max.text.chars=100000
+max.text.chars=
 ```
 
 将工具名称和文本规则替换为业务实际要求；未配置白名单，其他普通工具通常放行。保存为 UTF-8 `policy.properties`，启动：

@@ -71,6 +71,32 @@ class PolicyEngineTest {
     }
 
     @Test
+    void omittedOrBlankTextLimitAllowsLongTextButKeepsContentRules() {
+        for (String configured : new String[] {null, "", "  "}) {
+            Properties properties = new Properties();
+            if (configured != null) {
+                properties.setProperty("max.text.chars", configured);
+            }
+            properties.setProperty("deny.text", "SECRET");
+            LocalPolicy policy = new LocalPolicy(properties);
+            assertEquals(0, policy.maxTextChars());
+            String longText = "x".repeat(100001);
+            assertTrue(
+                    policy.evaluate(
+                                    new SecurityEvent(
+                                            SecurityEvent.Phase.MODEL_INPUT, "chat", longText))
+                            .allowed());
+            assertFalse(
+                    policy.evaluate(
+                                    new SecurityEvent(
+                                            SecurityEvent.Phase.MODEL_INPUT,
+                                            "chat",
+                                            longText + "SECRET"))
+                            .allowed());
+        }
+    }
+
+    @Test
     void literalRulesAndLengthLimit() {
         Properties p = new Properties();
         p.setProperty("deny.tools", "sendEmail");

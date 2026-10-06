@@ -109,10 +109,17 @@ public final class LocalPolicy implements Detector {
                 split(properties.getProperty("deny.text", "")).stream()
                         .map(s -> s.toLowerCase(Locale.ROOT))
                         .toList();
-        maxChars = Integer.parseInt(properties.getProperty("max.text.chars", "100000"));
-        if (maxChars < 1 || maxChars > 10000000) {
+        String textLimit = properties.getProperty("max.text.chars", "").trim();
+        // 未配置或空值不限制文本；显式数值必须是有效正整数。
+        maxChars = textLimit.isEmpty() ? 0 : Integer.parseInt(textLimit);
+        if (!textLimit.isEmpty() && (maxChars < 1 || maxChars > 10000000)) {
             throw new IllegalArgumentException("Invalid max.text.chars");
         }
+    }
+
+    /** 每次检查的文本总长度上限，单位为 UTF-16 单元；返回 0 表示未启用限制。 */
+    public int maxTextChars() {
+        return maxChars;
     }
 
     private static Set<String> mcpNames(Properties properties, String key, String pattern) {
@@ -180,7 +187,7 @@ public final class LocalPolicy implements Detector {
             return Decision.deny("tool-not-allowed");
         }
         String text = event.text() == null ? "" : event.text();
-        if (text.length() > maxChars) {
+        if (maxChars > 0 && text.length() > maxChars) {
             return Decision.deny("text-limit");
         }
         String normalized = text.toLowerCase(Locale.ROOT);

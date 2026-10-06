@@ -44,6 +44,20 @@ class RagBridgeTest {
     }
 
     @Test
+    void disabledTextLimitAllowsAggregatedTextAndExplicitLimitIncludesSeparators() {
+        Bridge.initialize(engine, 0);
+        StringBuilder text = new StringBuilder();
+        Bridge.append(text, "x".repeat(100001));
+        Bridge.append(text, "tail");
+        assertEquals(100007, text.length());
+        Bridge.initialize(engine, 5);
+        StringBuilder bounded = new StringBuilder();
+        Bridge.append(bounded, "1234");
+        assertEquals(5, bounded.length());
+        assertThrows(SecurityBlockedException.class, () -> Bridge.append(bounded, "x"));
+    }
+
+    @Test
     void metadataIsUntrustedTextAndNeverBecomesIdentity() {
         var source = (ContentRetriever) q -> List.of();
         assertEquals(
