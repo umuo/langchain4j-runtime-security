@@ -397,6 +397,28 @@ public final class AgentTreeQuickStart {
 
 检测、审计、流式和分页预算是不同层的预算，不是统一业务请求的硬返回期限。多个边界分别检查，不响应中断的插件／业务 I/O 可能仍在运行。
 
+### 9.1 最小运行配置
+
+普通模型和普通工具的最小安全接入，可以直接使用 [minimal.properties](../config/minimal.properties)。不需要额外 JSON 策略、身份接入或文件审计：
+
+```properties
+policy.version=minimal-v1
+deny.tools=sendEmail,deleteAll
+deny.text=IGNORE_SECURITY_TEST,DEMO_SECRET_123
+max.text.chars=100000
+```
+
+将工具名称和文本规则替换为业务实际要求；未配置白名单，其他普通工具通常放行。保存为 UTF-8 `policy.properties`，启动：
+
+```bash
+java -javaagent:/absolute/path/agent-security-javaagent.jar=/absolute/path/policy.properties \
+  -jar /absolute/path/application.jar
+```
+
+该配置省略 `audit.path`，审计写标准错误输出，SDK 不创建本地审计文件；部署平台仍可能收集 stderr 并保存日志。其余资源限制使用默认值，不强制要求用户或 Agent 身份，不加载结构化工具参数策略。**MCP 操作默认拒绝，流式输出仍先缓冲检查再交付**；需要 MCP 时显式增加对应授权，不是关闭安全检查。
+
+技术上，一个存在的空文件即可启用默认策略；上面的四项是便于验收实际拦截的最小示例，不是必填键。若只想保留原始运行路径，使用包含无策略跳过功能的新构建，不传配置路径，见第 5.1 节。
+
 ## 10. 审计、监控与故障处理
 
 Agent 未配置 audit.path 时用脱敏 stderr 审计；需要文件日志时设置独立路径。独立 SDK 用 `FileAuditSink`，必要时包 `BoundedAuditSink`，传入引擎。审计必须成功才能放行；BoundedAuditSink 失败、超时或饱和后保持拒绝，排查并重建实例，不能用无操作 sink 绕过故障。
@@ -423,6 +445,65 @@ Agent 未配置 audit.path 时用脱敏 stderr 审计；需要文件日志时设
 | 插件没有生效 | 应用 classpath、SPI 文件、实际 phase | 先自检 SPI，再跑真实拒绝用例 |
 
 future 可能将拒绝包在 CompletionException／ExecutionException 中，流式输出拒绝通常走 onError。按接口统一映射业务错误，切勿捕获后继续工具副作用或把原始服务端异常文本直接回灌给模型。完整恢复说明见 [运行手册](operations.md)。
+
+### 10.1 启用 Agent 的性能开销
+
+当前没有正式性能基准，不能给出可靠的固定延迟或吞吐下降百分比。以下说明当前实现中的开销来源；功能测试通过不等于性能验收。
+
+| 场景 | 开销与影响 |
+| --- | --- |
+| 新构建不传策略路径 | 启动入口直接返回，无检测、审计或流式缓冲；仍有 JVM 加载 Agent 的一次性开销 |
+| 指定策略启动 | 读取配置和工具 JSON、装配引擎，目标类加载时进行插桩；初次使用可能加载 SPI 插件 |
+| 模型／工具／RAG／Memory／MCP 边界 | 构造安全事件、提取文本和上下文、检查并记录审计；输入和输出可能分别产生事件，一个业务请求可能多次检查 |
+| 文本规则 | 文本拼接、大小写转换及禁止子串扫描，内容和规则增多会增加 CPU 与临时对象分配 |
+| 工具 JSON／自定义 Detector | 参数解析、校验；扩展检测器通过隔离执行器运行，会产生线程调度及等待开销；内置 LocalPolicy 和 RequiredContextPolicy 在调用线程执行 |
+| 远程 Detector | 等待远程安全服务，增加网络和服务处理延迟；需通过插件显式接入 |
+| 流式输出 | 缓冲内容、事件和等待完整检查，增加内存占用，并改变首字延迟和交付节奏 |
+| 遥测收集 | 增加计时、计数和有界内存记录；宿主额外导出的成本取决于实现 |
+
+审计尤其需要纳入容量规划：`BoundedAuditSink` 使用单个写线程和有界队列，**调用方等待审计写入完成才继续**，不是提交后立即返回。高并发可能排队；未设置 `audit.path` 时仍写 stderr，也存在日志 I/O 和线程交接开销。
+
+文件审计默认 `audit.force=true`，每条审计记录调用 `FileChannel.force(true)` 强制刷盘，存储延迟可能成为吞吐瓶颈。`audit.force=false` 可以减少逐条强制刷盘，但降低崩溃／断电时的持久性保证，调用方仍等待写入完成。审计失败、超时或队列饱和会进入持续拒绝状态，需排查并重建实例；增加超时或队列不保证吞吐提高。
+
+目前没有 properties 开关关闭审计，也没有直接透传流式输出的安全模式。需要评估真实应用时，对比无 Agent、新构建无策略、最小策略、文件审计、业务 Detector 等组合，观察端到端 P50／P95／P99、吞吐、CPU、分配与 GC、流式首字时间和审计排队／拒绝计数。不要将配置中的检测超时当成每次固定开销。
+
+### 10.2 本地文件与日志内容
+
+Agent 内置的本地写入主要来自文件审计。使用完整部署示例：
+
+```properties
+audit.path=./var/agent-security/decisions.jsonl
+audit.max.bytes=10485760
+audit.backups=5
+audit.force=true
+```
+
+会创建父目录、当前日志和锁文件；备份在达到轮转阈值后逐步产生：
+
+```text
+<JVM工作目录>/var/agent-security/
+├── decisions.jsonl
+├── decisions.jsonl.lock
+├── decisions.jsonl.1
+├── decisions.jsonl.2
+├── ...
+└── decisions.jsonl.5
+```
+
+`audit.path` 的相对路径以 **JVM 工作目录**为基准；`tool.policy.path` 则以 **properties 所在目录**为基准，二者不同。默认每文件约 10 MiB，当前文件加 5 个备份的日志容量约 60 MiB，并非磁盘硬配额。锁文件用于防止多个进程共享同一审计日志。
+
+内置审计记录时间、事件 UUID、允许／拒绝、阶段、规则、策略版本，以及存在时的父子 Agent 关联标识；不记录完整提示词、工具参数和返回正文。
+
+| 配置或组件 | 本地文件行为 |
+| --- | --- |
+| 未指定策略路径的新构建 | 不初始化 Agent，不创建 Agent 审计文件 |
+| 未配置 audit.path | 写 stderr，不由 SDK 创建审计文件；应用、容器或系统可能将 stderr 保存为日志 |
+| 配置 audit.path | 写审计日志、锁文件和轮转备份 |
+| properties 和工具 JSON | 启动时只读，不自动修改或热更新 |
+| 内置遥测、健康状态和故障诊断 | 内存中收集，不自动落盘或创建服务端口 |
+| 自定义插件／宿主导出 | 由接入实现决定，可能额外产生文件或网络请求 |
+
+以上不包含应用自身、模型客户端、部署平台和 JVM 自行生成的日志或诊断文件。
 
 ## 11. 新项目接入完成的标准
 

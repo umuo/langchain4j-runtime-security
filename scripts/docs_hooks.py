@@ -9,6 +9,7 @@ EXAMPLES = (
     "demo.properties",
     "tool-demo.properties",
     "deployment-example.properties",
+    "minimal.properties",
     "tool-policy-example.json",
     "context-tool-policy-example.json",
 )
