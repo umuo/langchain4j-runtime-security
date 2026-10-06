@@ -2,6 +2,8 @@
 
 本文是新用户的统一入口。先看功能表和接入选择，再运行一个拒绝示例；需要某项能力时，按对应步骤接入，详细规则查专题文档。无需先阅读源码。
 
+快速阅读入口：已有项目接入看第 5 节；最小策略看第 9.2 节；启动状态与空值看第 9.3～9.4 节；性能和本地文件看第 10.1～10.2 节。全部配置及中文注释见 [部署示例](../config/deployment-example.properties)。
+
 本文对应仓库 `0.1.0-SNAPSHOT` 当前实现：Java Agent 默认构建使用 **LangChain4j core 1.20.0**，另验证 **core 1.21.0**；运行时准入 **1.20.x／1.21.x 正式补丁版本 + 关键 API 检查**，MCP 仍要求 **1.20.0-beta30**，详见 [版本准入](langchain4j-compatibility.md)。源码按 Java 17 编译，最近完整发布验证运行于 macOS arm64 / JDK 21.0.4；634 项测试通过不等于所有平台、外部服务或生产场景均已验收。SDK、Agent、插件应来自同一构建，不能只凭相同 SNAPSHOT 版本号混用。
 
 ## 1. 它解决什么问题
@@ -71,7 +73,30 @@ flowchart LR
 | `io.github.umuo:agent-security-telemetry` | Prometheus 文本及 OTLP/HTTP 日志导出；可选 |
 | `agent-security-javaagent.jar` | JVM 启动加载的自动拦截制品，独立放到部署目录 |
 
-Maven 坐标已迁移为 io.github.umuo，Java 包名不变。本手册不假设制品已发布到 Maven Central；当前 SNAPSHOT 可先从源码构建、安装到本地仓库。公开制品发布与 release 版本引用见 [Central 发布手册](maven-central-publishing.md)。
+Maven 坐标已迁移为 `io.github.umuo`，Java 包名仍为 `io.agentsecurity`。公开 release 消费与发布流程见 [Central 发布手册](maven-central-publishing.md)；当前源码 SNAPSHOT 可先构建、安装到本地仓库。
+
+### 3.1 先确认你使用的 JAR 版本
+
+本手册描述当前源码。已经发布的 `0.1.0-alpha.1` 不会随 main 更新；近期新增的“无策略跳过初始化”和“文本上限未配置／空值不限制”必须使用包含对应提交的新构建。不要把最新示例直接套到旧 JAR 后，就以为新行为已生效。
+
+| 行为 | 已发布 0.1.0-alpha.1 | 包含本次更新的源码构建 |
+| --- | --- | --- |
+| 不传策略文件路径 | 启动失败 | 跳过初始化和插桩 |
+| max.text.chars 未配置 | 默认 100000 | 不限制文本长度 |
+| max.text.chars 空值 | 配置错误 | 不限制文本长度 |
+| 指定不存在或非法的策略文件 | 启动失败 | 仍启动失败 |
+
+下载已发布版本的 Agent，例如：
+
+```bash
+mvn org.apache.maven.plugins:maven-dependency-plugin:3.8.1:copy \
+  -Dartifact=io.github.umuo:agent-security-javaagent:0.1.0-alpha.1 \
+  -DoutputDirectory=./security
+```
+
+上述命令下载旧版本，用于已有 release 接入，**不包含表中的新行为**。需要新行为时先按第 4 节构建源码，使用 `agent-security-javaagent/target/agent-security-javaagent.jar`；新 release 发布后改用其实际版本号。下载名带版本，源码构建的 Agent 文件名不带版本。
+
+基础 Agent 接入不需要在应用 pom 中加入 javaagent 制品；它由 JVM 参数加载。独立 SDK 或业务策略插件则添加所需模块依赖，并与 Agent 保持同一构建。第 6 节展示本地 SNAPSHOT；使用 Central release 时替换为实际发布版本，也无需沿用仓库的本地缓存路径。
 
 ## 4. 十分钟跑通：先观察实际阻断
 
@@ -186,7 +211,20 @@ tool.policy.path=tool-policy.json
 
 真实应用参数要对应实际工具签名。进一步规则、JSON 解码和租户绑定见 [工具策略](tool-policy.md)。主策略与工具 JSON 在启动时加载，编辑文件后默认需重启；动态发布是第 8 节的独立能力。
 
-### 5.3 验收你的应用
+### 5.3 路径与启动参数
+
+推荐策略和 JAR 都使用绝对路径。含空格时，将整个 JVM 参数放在引号内：
+
+```bash
+java "-javaagent:/opt/my app/agent-security-javaagent.jar=/opt/my app/policy.properties" \
+  -jar "/opt/my app/application.jar"
+```
+
+策略路径本身相对 JVM 工作目录；`tool.policy.path` 相对策略文件目录；`audit.path` 相对 JVM 工作目录。配置文件使用 UTF-8，Windows 路径建议用 `C:/app/security/policy.properties` 等正斜杠形式，避免 Java properties 的反斜杠转义。普通 Java、Boot 和容器都遵循这套 JVM 参数；容器内文件路径必须实际存在并可读。
+
+注释单独占一行，不要写 `max.text.chars=100000 # 上限`，否则注释会成为值的一部分。每个键只保留一行，不依赖重复键覆盖；布尔值按示例填写小写 `true`／`false`。修改 properties 或工具 JSON 后重启，不会自动重新加载。
+
+### 5.4 验收你的应用
 
 先跑一个合法请求，再分别跑禁止工具、非法参数、拒绝输出。核对受保护工具／检索器／存储真实调用次数；输入拒绝应该是零副作用，输出拒绝时上游操作可能已发生。
 
@@ -436,6 +474,55 @@ java -javaagent:/absolute/path/agent-security-javaagent.jar=/absolute/path/polic
 
 技术上，一个存在的空文件即可启用默认策略；上面的四项是便于验收实际拦截的最小示例，不是必填键。若只想保留原始运行路径，使用包含无策略跳过功能的新构建，不传配置路径，见第 5.1 节。
 
+### 9.3 不传路径、空文件和最小策略的区别
+
+以下默认行为仅针对内置策略；如果应用注册了 Detector SPI 插件，插件仍可能增加限制。
+
+| 状态 | 是否插桩 | 实际行为 |
+| --- | --- | --- |
+| 不加载 javaagent | 否 | 没有本项目的自动保护 |
+| 新构建加载 Agent，不传路径／参数为空白 | 否 | 原调用路径；无 Agent 检测、审计或缓冲线程 |
+| 指向存在的空 properties 文件 | 是 | 默认策略生效，不等于禁用保护 |
+| 指向 minimal.properties | 是 | 默认策略加示例工具黑名单和文本规则 |
+| 显式传入错误路径、非法配置 | 未完成安装 | 启动失败，不退化为无保护运行 |
+
+空文件下的默认策略：
+
+| 项目 | 默认行为 |
+| --- | --- |
+| 普通工具／检索器名称 | 无白名单或黑名单限制 |
+| 关键词与结构化工具参数策略 | 无禁止词，不加载工具 JSON |
+| 用户／Agent 上下文、Memory 权限 | 不额外强制要求 |
+| max.text.chars | 不限制文本总长度 |
+| MCP 工具、资源、提示词、目录发现 | 全部拒绝，须显式授权 |
+| RAG、Memory 数量 | 内容 256、每个段落元数据 64、历史消息 256 |
+| 流式资源 | 缓冲后检查，100000 UTF-16 单元／2048 事件／64 活跃流／60000ms |
+| MCP 响应与分页 | 响应 1 MiB；分页 16 页／128 项／1 MiB JSON／30000ms |
+| 检测资源 | 时限 500ms、并发容量 4 |
+| 审计 | stderr，确认写入后继续；等待 1000ms、队列容量 128 |
+| 遥测／策略版本 | 收集关闭；版本 unversioned |
+
+即使业务内容规则为空，数量限制、审计、框架版本和 API 检查仍会影响受保护调用。不要用空文件模拟无保护运行。
+
+### 9.4 配置项为空值时如何处理
+
+删除一行或注释掉表示未配置；保留 `key=` 表示显式空值，不能对所有键统一置空。
+
+| 配置项 | 未配置 | 显式空值 |
+| --- | --- | --- |
+| max.text.chars | 不限制 | 不限制；纯空白也一样 |
+| deny.tools、deny.text | 无对应禁止规则 | 同样无对应禁止规则 |
+| allow.tools、allow.retrievers | 不限制名称 | 拒绝全部对应操作 |
+| 四个 allow.mcp.* 白名单 | 拒绝对应 MCP 操作 | 同样拒绝 |
+| policy.version | unversioned | 启动失败 |
+| tool.policy.path | 不加载 JSON 策略 | 启动失败 |
+| audit.path | stderr 审计 | 启动失败 |
+| memory.read／write／delete.permission | 不要求对应权限 | 启动失败 |
+| 布尔配置，如 context.required、telemetry.enabled | 使用默认 true／false | 启动失败 |
+| 其他数值限制，如 stream.max.chars、detector.timeout.millis | 使用各自默认值 | 启动失败，不表示无限制 |
+
+白名单为逗号分隔列表，空白列表项会被忽略；数值和布尔配置不要套用列表的空值规则。JSON 策略采用自己的字段和校验规则，不适用 properties 的空值表。
+
 ## 10. 审计、监控与故障处理
 
 Agent 未配置 audit.path 时用脱敏 stderr 审计；需要文件日志时设置独立路径。独立 SDK 用 `FileAuditSink`，必要时包 `BoundedAuditSink`，传入引擎。审计必须成功才能放行；BoundedAuditSink 失败、超时或饱和后保持拒绝，排查并重建实例，不能用无操作 sink 绕过故障。
@@ -459,9 +546,26 @@ Agent 未配置 audit.path 时用脱敏 stderr 审计；需要文件日志时设
 | `agent-budget-checks`／`agent-budget-invocations` | 循环调度、重复边界、预算快照 | 分析工作量；可信入口为新任务配置合理预算 |
 | `agent-invocation-inactive` | 父任务提前返回、取消、撤销或过期 | 修正任务生命周期与等待关系 |
 | MCP HTTP 认证／连接故障 | 服务端、凭据、目标和首个失效原因 | 修复后显式重建传输／客户端 |
+| 无配置但仍启用了保护，或空值导致启动失败 | 是否使用旧 release JAR | 核对第 3.1 节，不将新行为假设为旧版本功能 |
+| `text-limit` | max.text.chars 显式值及拼接后的消息集合 | 检查历史、系统提示词及换行；此上限不是每条消息额度 |
+| MCP 的 `*-not-allowed` | 对应服务与操作是否在该类白名单 | 精确授权；普通 allow.tools 不能授权 MCP |
 | 插件没有生效 | 应用 classpath、SPI 文件、实际 phase | 先自检 SPI，再跑真实拒绝用例 |
 
 future 可能将拒绝包在 CompletionException／ExecutionException 中，流式输出拒绝通常走 onError。按接口统一映射业务错误，切勿捕获后继续工具副作用或把原始服务端异常文本直接回灌给模型。完整恢复说明见 [运行手册](operations.md)。
+
+业务入口可以统一捕获同步拒绝，示例：
+
+```java
+try {
+    return assistant.chat(userMessage);
+} catch (io.agentsecurity.core.SecurityBlockedException denied) {
+    // 记录固定规则标识，映射为应用自己的错误；不继续执行原操作。
+    logger.warn("智能体操作被安全策略拒绝，rule={}", denied.ruleId());
+    throw new BusinessException("智能体操作被安全策略拒绝");
+}
+```
+
+`assistant`、`logger` 和 `BusinessException` 为宿主应用已有对象／类型，示例不是 SDK 提供的 HTTP 处理器。工具执行异常也可能被业务框架包装，需沿异常链识别；future 和流式接口分别在异常完成／错误回调中处理。不要在 DENY 后用不带 Agent 的调用重试；正常 ALLOW 审计也不证明业务操作最终成功。
 
 ### 10.1 启用 Agent 的性能开销
 
@@ -560,3 +664,5 @@ audit.force=true
 2026-10-03，在 JDK 21.0.4 上使用同一构建产物，按 Java 17 目标编译两个完整 Java 示例：`SdkQuickStart` 输出 `toolCalls=1`，`AgentTreeQuickStart` 输出 `parentLinked=true`、`invocations=2`、`protectedChecks=1`。工具 JSON 经 SDK 验证 limit=10 放行、limit=11 拒绝。使用本手册基础配置和工具 JSON 启动真实 Agent 演示：allowed／tool-args-allowed 放行，tool／tool-args-foreign 阻断且工具调用数为零。Wiki 严格构建通过。
 
 本次仅修改文档，未重跑整套 634 项发布矩阵；该数量来自最近一次运行时代码发布验收。上述检查证明手册示例与当前 API 对齐，不证明实际业务项目已接入或所有攻击均可检测。
+
+2026-10-06 手册复核：补充旧 release 与源码行为差异、启动状态、默认策略、空值规则、路径语法和业务拒绝处理。文档严格构建通过；本轮为文档补充，不重复宣称整套发布矩阵已运行。
