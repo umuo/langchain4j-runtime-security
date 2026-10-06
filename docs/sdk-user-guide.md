@@ -143,6 +143,16 @@ java -javaagent:/opt/agent-security/agent-security-javaagent.jar=/opt/agent-secu
 
 把 `-javaagent` 放在 `-jar` 前。IDE 填入 **VM options**；部署平台放入 Java 进程的 JVM 参数。Agent 必须先于可能加载 LangChain4j 类的其他 Agent，已加载目标类时会拒绝启动。不支持启动后任意 attach 或随意切换 LangChain4j 版本。
 
+未指定策略路径时，Agent 直接退出初始化，应用按原流程运行：
+
+```bash
+java -javaagent:/opt/agent-security/agent-security-javaagent.jar -jar application.jar
+```
+
+此时不安装插桩、不创建检测／审计线程、不缓冲流式输出，也不启用默认 MCP 拒绝策略；只有 JVM 加载 Agent JAR 并调用启动入口的一次性开销，不能承诺启动耗时完全为零。空参数或纯空白参数也按未配置处理。
+
+注意：**存在的空配置文件仍会启用安全检查与默认限制**。显式提供不存在、不可读或内容非法的配置文件仍然启动失败，不会静默关闭安全保护。该行为从本次源码变更开始生效，已经发布的 `0.1.0-alpha.1` 不会自动更新，需构建最新源码或发布新版本。
+
 基础规则不要求应用新增 SDK 依赖。若需要上下文、插件或读取诊断，再引入同一构建版本 core。不要把多个不同构建的 core／Agent 混在应用 classpath 中。
 
 ### 5.2 增加工具参数约束

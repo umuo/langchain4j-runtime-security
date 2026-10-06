@@ -270,3 +270,7 @@ mkdocs serve
 ## Maven Central 发布准备
 
 Maven 坐标已迁移为 `io.github.umuo`，Java 包名不变，项目使用 MIT 许可证。当前开发版本仍为 `0.1.0-SNAPSHOT`，不代表已发布到 Central。账号验证、GPG／Token、GitHub Secrets、上传与引用步骤见 [Maven Central 发布手册](docs/maven-central-publishing.md)。
+
+### 未指定安全策略时的行为
+
+最新源码支持仅指定 `-javaagent:/path/agent-security-javaagent.jar` 而不传策略路径：启动入口直接返回，不安装 transformer、不创建检测／审计线程，保留应用原始调用和流式输出路径。仅有 JVM 加载 Agent 的一次性启动开销。空白参数同样处理；传入空配置文件仍启用默认策略，显式无效的文件路径或配置仍导致启动失败。此行为需使用包含本次变更的新构建，已发布的 `0.1.0-alpha.1` 不变。

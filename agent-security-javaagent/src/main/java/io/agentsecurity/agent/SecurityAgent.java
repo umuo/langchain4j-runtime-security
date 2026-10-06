@@ -7,6 +7,10 @@ import java.lang.instrument.Instrumentation;
 public final class SecurityAgent {
 
     public static void premain(String arguments, Instrumentation instrumentation) throws Exception {
+        // 未指定策略时直接退出，不扫描已加载类、不注册 transformer，也不创建检测和审计线程。
+        if (arguments == null || arguments.isBlank()) {
+            return;
+        }
         AgentBootstrap.initialize(arguments, instrumentation);
         AgentInstrumentation.install(instrumentation);
         io.agentsecurity.core.health.AgentCoverage.global().installed();
