@@ -29,14 +29,7 @@ public final class BoundedAuditSink implements BiConsumer<SecurityEvent, Decisio
     public BoundedAuditSink(
             BiConsumer<SecurityEvent, Decision> delegate, Duration timeout, int capacity) {
         this.delegate = Objects.requireNonNull(delegate);
-        if (timeout.isNegative()
-                || timeout.isZero()
-                || timeout.compareTo(Duration.ofSeconds(60)) > 0) {
-            throw new IllegalArgumentException("Invalid audit timeout");
-        }
-        if (capacity < 1 || capacity > 4096) {
-            throw new IllegalArgumentException("Invalid audit capacity");
-        }
+        validateSettings(timeout, capacity);
         this.capacity = capacity;
         timeoutNanos = timeout.toNanos();
         writer =
@@ -66,6 +59,19 @@ public final class BoundedAuditSink implements BiConsumer<SecurityEvent, Decisio
                         }
                     }
                 };
+    }
+
+    /** 只校验审计等待与队列参数，不创建工作线程，供部署预检查复用。 */
+    public static void validateSettings(Duration timeout, int capacity) {
+        Objects.requireNonNull(timeout);
+        if (timeout.isNegative()
+                || timeout.isZero()
+                || timeout.compareTo(Duration.ofSeconds(60)) > 0) {
+            throw new IllegalArgumentException("Invalid audit timeout");
+        }
+        if (capacity < 1 || capacity > 4096) {
+            throw new IllegalArgumentException("Invalid audit capacity");
+        }
     }
 
     @Override

@@ -38,15 +38,7 @@ public final class FileAuditSink implements BiConsumer<SecurityEvent, Decision>,
 
     public FileAuditSink(Path path, long maxBytes, int backups, boolean force, String policyVersion)
             throws IOException {
-        if (maxBytes < 1024 || maxBytes > (1L << 40)) {
-            throw new IllegalArgumentException("Invalid audit.max.bytes");
-        }
-        if (backups < 1 || backups > 100) {
-            throw new IllegalArgumentException("Invalid audit.backups");
-        }
-        if (policyVersion == null || !policyVersion.matches("[a-zA-Z0-9_.-]{1,80}")) {
-            throw new IllegalArgumentException("Invalid policy.version");
-        }
+        validateSettings(maxBytes, backups, policyVersion);
         this.path = path.toAbsolutePath().normalize();
         this.maxBytes = maxBytes;
         this.backups = backups;
@@ -70,6 +62,19 @@ public final class FileAuditSink implements BiConsumer<SecurityEvent, Decision>,
             }
             lockChannel.close();
             throw error;
+        }
+    }
+
+    /** 只校验文件审计参数，不创建目录、文件或锁，供部署预检查复用。 */
+    public static void validateSettings(long maxBytes, int backups, String policyVersion) {
+        if (maxBytes < 1024 || maxBytes > (1L << 40)) {
+            throw new IllegalArgumentException("Invalid audit.max.bytes");
+        }
+        if (backups < 1 || backups > 100) {
+            throw new IllegalArgumentException("Invalid audit.backups");
+        }
+        if (policyVersion == null || !policyVersion.matches("[a-zA-Z0-9_.-]{1,80}")) {
+            throw new IllegalArgumentException("Invalid policy.version");
         }
     }
 

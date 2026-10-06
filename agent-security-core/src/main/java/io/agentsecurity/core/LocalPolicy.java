@@ -190,9 +190,12 @@ public final class LocalPolicy implements Detector {
         if (maxChars > 0 && text.length() > maxChars) {
             return Decision.deny("text-limit");
         }
-        String normalized = text.toLowerCase(Locale.ROOT);
-        if (deniedText.stream().anyMatch(normalized::contains)) {
-            return Decision.deny("denied-text");
+        // 没有禁止词时不扫描或复制全文，避免大文本产生无用的 CPU 与内存开销。
+        if (!deniedText.isEmpty()) {
+            String normalized = text.toLowerCase(Locale.ROOT);
+            if (deniedText.stream().anyMatch(normalized::contains)) {
+                return Decision.deny("denied-text");
+            }
         }
         return Decision.allow();
     }

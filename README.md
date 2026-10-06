@@ -278,3 +278,14 @@ Maven 坐标已迁移为 `io.github.umuo`，Java 包名不变，项目使用 MIT
 最小安全接入配置见 [config/minimal.properties](config/minimal.properties)；全部配置及中文说明见 [部署示例](config/deployment-example.properties)。性能开销和本地文件说明见 [SDK 使用手册](docs/sdk-user-guide.md)。
 
 最新源码的 `max.text.chars` 未配置或空值时不限制文本长度；填写正整数时限制单次检查提取、拼接后的文本总长度。流式缓冲和工具参数等独立资源限制仍生效，详情见 [文本长度说明](docs/sdk-user-guide.md)。已发布的旧版本不自动改变行为。
+
+### 部署前检查策略配置
+
+使用包含此功能的新构建，在启动应用前运行（不加 `-javaagent`）：
+
+```bash
+java -cp /path/agent-security-javaagent.jar \
+  io.agentsecurity.agent.PolicyCheck /path/policy.properties
+```
+
+退出码：0 为配置通过，1 为校验失败，2 为命令用法错误。检查不注册插桩、不调用检测服务、不创建审计文件；启动与检查均拒绝重复配置键。应用版本、插件和实际文件写入权限仍需接入验收，详见 [使用手册](docs/sdk-user-guide.md)。

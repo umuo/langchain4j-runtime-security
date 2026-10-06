@@ -85,6 +85,8 @@ Maven 坐标已迁移为 `io.github.umuo`，Java 包名仍为 `io.agentsecurity`
 | max.text.chars 未配置 | 默认 100000 | 不限制文本长度 |
 | max.text.chars 空值 | 配置错误 | 不限制文本长度 |
 | 指定不存在或非法的策略文件 | 启动失败 | 仍启动失败 |
+| properties 重复键 | 后面的值覆盖前面的值 | 启动及预检查均拒绝重复键 |
+| PolicyCheck 部署预检查入口 | 不包含 | 支持，见第 5.4 节 |
 
 下载已发布版本的 Agent，例如：
 
@@ -222,9 +224,22 @@ java "-javaagent:/opt/my app/agent-security-javaagent.jar=/opt/my app/policy.pro
 
 策略路径本身相对 JVM 工作目录；`tool.policy.path` 相对策略文件目录；`audit.path` 相对 JVM 工作目录。配置文件使用 UTF-8，Windows 路径建议用 `C:/app/security/policy.properties` 等正斜杠形式，避免 Java properties 的反斜杠转义。普通 Java、Boot 和容器都遵循这套 JVM 参数；容器内文件路径必须实际存在并可读。
 
-注释单独占一行，不要写 `max.text.chars=100000 # 上限`，否则注释会成为值的一部分。每个键只保留一行，不依赖重复键覆盖；布尔值按示例填写小写 `true`／`false`。修改 properties 或工具 JSON 后重启，不会自动重新加载。
+注释单独占一行，不要写 `max.text.chars=100000 # 上限`，否则注释会成为值的一部分。每个键只保留一行；新构建会拒绝重复键（包括转义后相同的键），不再静默覆盖；布尔值按示例填写小写 `true`／`false`。修改 properties 或工具 JSON 后重启，不会自动重新加载。
 
-### 5.4 验收你的应用
+### 5.4 部署前只检查配置
+
+使用包含本轮变更的新构建，不启动应用、不使用 `-javaagent`，执行：
+
+```bash
+java -cp /absolute/path/agent-security-javaagent.jar \
+  io.agentsecurity.agent.PolicyCheck /absolute/path/policy.properties
+```
+
+退出码 0 表示配置通过；1 表示校验失败；2 表示命令用法错误。检查复用 Agent 启动逻辑，验证重复键、未知键、数值／布尔／空值、工具 JSON 及相对路径；不会加载应用插件、发起检测服务请求、注册 transformer 或创建审计文件／工作线程。失败日志不打印配置值和异常堆栈。
+
+它不是端到端验收：实际应用的 LangChain4j 版本、SPI 插件可用性、远程服务、审计目录写权限和文件锁，仍需在真实启动与调用时验证。旧 release JAR 不包含这个入口。
+
+### 5.5 验收你的应用
 
 先跑一个合法请求，再分别跑禁止工具、非法参数、拒绝输出。核对受保护工具／检索器／存储真实调用次数；输入拒绝应该是零副作用，输出拒绝时上游操作可能已发生。
 
@@ -588,6 +603,8 @@ try {
 
 目前没有 properties 开关关闭审计，也没有直接透传流式输出的安全模式。需要评估真实应用时，对比无 Agent、新构建无策略、最小策略、文件审计、业务 Detector 等组合，观察端到端 P50／P95／P99、吞吐、CPU、分配与 GC、流式首字时间和审计排队／拒绝计数。不要将配置中的检测超时当成每次固定开销。
 
+内置 LocalPolicy 与 RequiredContextPolicy 在业务线程执行；隔离执行器的超时机制不能中断它们的文本提取、拼接或扫描。尤其 `max.text.chars` 不限制时，大文本的 CPU 与内存成本仍由应用承担，`detector.timeout.millis` 不是整个文本处理过程的硬超时。新构建在没有禁止词时跳过全文大小写转换和关键词扫描，但仍保留其他规则及审计检查。
+
 ### 10.2 本地文件与日志内容
 
 Agent 内置的本地写入主要来自文件审计。使用完整部署示例：
@@ -666,3 +683,5 @@ audit.force=true
 本次仅修改文档，未重跑整套 634 项发布矩阵；该数量来自最近一次运行时代码发布验收。上述检查证明手册示例与当前 API 对齐，不证明实际业务项目已接入或所有攻击均可检测。
 
 2026-10-06 手册复核：补充旧 release 与源码行为差异、启动状态、默认策略、空值规则、路径语法和业务拒绝处理。文档严格构建通过；本轮为文档补充，不重复宣称整套发布矩阵已运行。
+
+2026-10-06 优化验收：全量 `mvn verify` 通过 671 项测试（core 90、policy 87、telemetry 18、Agent 111、普通 Java 277、Boot 88），零失败、零错误、零跳过。独立 JVM 验证无策略／空参数／空白参数保持工具和流式原行为，未加载 Bootstrap／Byte Buddy；真实模型请求超过旧默认长度时放行，显式上限拒绝时模型调用次数为零。打包配置检查入口退出码及无审计文件副作用通过，配置单元测试覆盖重复转义键、非法值和工具 JSON 相对路径。Wiki 严格构建通过。本轮没有运行发布脚本的隔离重建／SBOM，也没有发布新 Central 版本或测量完整性能指标。

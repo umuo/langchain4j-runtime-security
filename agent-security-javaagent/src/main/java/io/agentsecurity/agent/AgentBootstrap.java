@@ -25,17 +25,30 @@ import java.util.Properties;
 final class AgentBootstrap {
 
     static void initialize(String arguments, Instrumentation instrumentation) throws Exception {
-        for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
-            if (loaded.getName().startsWith("dev.langchain4j.")) {
-                throw new IllegalStateException(
-                        "LangChain4j already loaded; put the security agent before agents that load it");
+        configure(arguments, instrumentation, false);
+    }
+
+    /** 校验配置及工具策略，不注册插桩、不创建工作线程、不写审计文件。 */
+    static void validateConfiguration(String arguments) throws Exception {
+        configure(arguments, null, true);
+    }
+
+    private static void configure(
+            String arguments, Instrumentation instrumentation, boolean validationOnly)
+            throws Exception {
+        if (!validationOnly) {
+            for (Class<?> loaded : instrumentation.getAllLoadedClasses()) {
+                if (loaded.getName().startsWith("dev.langchain4j.")) {
+                    throw new IllegalStateException(
+                            "LangChain4j already loaded; put the security agent before agents that load it");
+                }
             }
         }
         if (arguments == null || arguments.isBlank()) {
             throw new IllegalArgumentException(
                     "Use -javaagent:agent.jar=/absolute/path/policy.properties");
         }
-        Properties properties = new Properties();
+        Properties properties = new UniqueProperties();
         try (var reader = Files.newBufferedReader(Path.of(arguments), StandardCharsets.UTF_8)) {
             properties.load(reader);
         }
@@ -115,6 +128,28 @@ final class AgentBootstrap {
                         .anyMatch(properties::containsKey)) {
             throw new IllegalArgumentException("File audit settings require audit.path");
         }
+        long auditMaxBytes = Long.parseLong(properties.getProperty("audit.max.bytes", "10485760"));
+        int auditBackups = Integer.parseInt(properties.getProperty("audit.backups", "5"));
+        var auditTimeout =
+                java.time.Duration.ofMillis(
+                        Long.parseLong(properties.getProperty("audit.timeout.millis", "1000")));
+        int auditCapacity = Integer.parseInt(properties.getProperty("audit.queue.capacity", "128"));
+        BoundedAuditSink.validateSettings(auditTimeout, auditCapacity);
+        if (properties.containsKey("audit.path")) {
+            String auditPath = properties.getProperty("audit.path");
+            if (auditPath.isBlank()) {
+                throw new IllegalArgumentException("Empty audit.path");
+            }
+            Path.of(auditPath);
+            FileAuditSink.validateSettings(auditMaxBytes, auditBackups, policyVersion);
+        }
+        String telemetryEnabled = properties.getProperty("telemetry.enabled", "false");
+        if (!telemetryEnabled.equals("true") && !telemetryEnabled.equals("false")) {
+            throw new IllegalArgumentException("Invalid telemetry.enabled");
+        }
+        if (validationOnly) {
+            return;
+        }
         java.util.function.BiConsumer<SecurityEvent, Decision> auditTarget =
                 (event, decision) -> {
                     // Deliberately omit prompt, tool arguments, results and arbitrary user-supplied
@@ -149,22 +184,12 @@ final class AgentBootstrap {
             auditTarget =
                     new FileAuditSink(
                             Path.of(auditPath),
-                            Long.parseLong(properties.getProperty("audit.max.bytes", "10485760")),
-                            Integer.parseInt(properties.getProperty("audit.backups", "5")),
+                            auditMaxBytes,
+                            auditBackups,
                             Boolean.parseBoolean(forceValue),
                             policyVersion);
         }
-        var audit =
-                new BoundedAuditSink(
-                        auditTarget,
-                        java.time.Duration.ofMillis(
-                                Long.parseLong(
-                                        properties.getProperty("audit.timeout.millis", "1000"))),
-                        Integer.parseInt(properties.getProperty("audit.queue.capacity", "128")));
-        String telemetryEnabled = properties.getProperty("telemetry.enabled", "false");
-        if (!telemetryEnabled.equals("true") && !telemetryEnabled.equals("false")) {
-            throw new IllegalArgumentException("Invalid telemetry.enabled");
-        }
+        var audit = new BoundedAuditSink(auditTarget, auditTimeout, auditCapacity);
         var telemetry =
                 telemetryEnabled.equals("true")
                         ? io.agentsecurity.core.telemetry.SecurityTelemetry.global()
@@ -181,5 +206,16 @@ final class AgentBootstrap {
                                 },
                                 "agent-security-shutdown"));
         GuardedStream.initialize(streamLimits);
+    }
+
+    /** 按 Properties 的实际转义和续行语义检测重复键，避免后面的值静默覆盖前面的策略。 */
+    private static final class UniqueProperties extends Properties {
+        @Override
+        public synchronized Object put(Object key, Object value) {
+            if (containsKey(key)) {
+                throw new IllegalArgumentException("Duplicate policy property");
+            }
+            return super.put(key, value);
+        }
     }
 }
