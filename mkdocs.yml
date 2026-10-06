@@ -75,11 +75,13 @@ nav:
       - 覆盖与健康诊断: runtime-diagnostics.md
       - LangChain4j 版本准入: langchain4j-compatibility.md
       - 性能诊断基线: performance-baseline.md
+      - Agent 链路性能基准: agent-performance-baseline.md
       - 恢复与子树验证: recovery-validation.md
       - Collector 与 TLS 验收: collector-acceptance.md
       - 运行与故障恢复: operations.md
       - 构建与发布工程: release-engineering.md
       - Maven Central 发布: maven-central-publishing.md
+      - 下一版发布说明草稿: next-release-notes.md
       - 生产验收清单: production-readiness.md
   - 设计与维护:
       - 源码学习路线: source-learning.md

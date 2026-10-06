@@ -51,6 +51,8 @@ jobs:
         run: bash scripts/release.sh
       - name: Smoke test telemetry benchmark accounting
         run: python3 scripts/benchmark_telemetry.py --iterations 1000 --threads 1 --forks 1 --capacity 64
+      - name: Smoke test packaged agent benchmark accounting
+        run: python3 scripts/benchmark_agent.py --iterations 20 --forks 1 --output target/benchmarks/agent-smoke.json
       - name: Smoke test exporter outage recovery
         run: |
           for mode in unavailable disconnect stall; do

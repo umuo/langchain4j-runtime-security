@@ -4,7 +4,7 @@
 
 快速阅读入口：已有项目接入看第 5 节；最小策略看第 9.2 节；启动状态与空值看第 9.3～9.4 节；性能和本地文件看第 10.1～10.2 节。全部配置及中文注释见 [部署示例](../config/deployment-example.properties)。
 
-本文对应仓库 `0.1.0-SNAPSHOT` 当前实现：Java Agent 默认构建使用 **LangChain4j core 1.20.0**，另验证 **core 1.21.0**；运行时准入 **1.20.x／1.21.x 正式补丁版本 + 关键 API 检查**，MCP 仍要求 **1.20.0-beta30**，详见 [版本准入](langchain4j-compatibility.md)。源码按 Java 17 编译，最近完整发布验证运行于 macOS arm64 / JDK 21.0.4；634 项测试通过不等于所有平台、外部服务或生产场景均已验收。SDK、Agent、插件应来自同一构建，不能只凭相同 SNAPSHOT 版本号混用。
+本文对应仓库 `0.1.0-SNAPSHOT` 当前实现：Java Agent 默认构建使用 **LangChain4j core 1.20.0**，另验证 **core 1.21.0**；运行时准入 **1.20.x／1.21.x 正式补丁版本 + 关键 API 检查**，MCP 仍要求 **1.20.0-beta30**，详见 [版本准入](langchain4j-compatibility.md)。源码按 Java 17 编译，最近完整发布验证运行于 macOS arm64 / JDK 21.0.4；677 项测试通过不等于所有平台、外部服务或生产场景均已验收。SDK、Agent、插件应来自同一构建，不能只凭相同 SNAPSHOT 版本号混用。
 
 ## 1. 它解决什么问题
 
@@ -347,7 +347,7 @@ try (var scope = SecurityContexts.open(context)) {
 4. 注册文件 `src/main/resources/META-INF/services/io.agentsecurity.core.Detector`，逐行填写实现类全名。
 5. 把插件及其依赖加入 **应用 classpath／Boot 依赖**，使用 `-javaagent` 启动并验证实际阻断。
 
-Agent 在受保护请求使用应用 ClassLoader 延迟加载 SPI，插件放在 Agent JAR 旁边并不会自动被发现。Spring `@Component` 不代替 SPI。独立 SDK 则直接将 Detector 实例放入引擎列表，不需要 SPI。
+新构建在受保护请求使用应用 ClassLoader 延迟加载 SPI，同一加载器的不同请求类共享插件实例；初始化失败后该加载器持续拒绝，修复后需重启。插件放在 Agent JAR 旁边并不会自动被发现。Spring `@Component` 不代替 SPI。独立 SDK 则直接将 Detector 实例放入引擎列表，不需要 SPI。
 
 可复制的插件项目、自检、普通 Java／Boot 部署方式见 [扩展指南](sdk-extension.md)。调用外部风控可用 [RemoteHttpDetector](remote-detector.md)，宿主必须提供内容最小化、可信 endpoint、凭据和连接资源配置；客户端自身不提供语义模型。
 
@@ -584,7 +584,7 @@ try {
 
 ### 10.1 启用 Agent 的性能开销
 
-当前没有正式性能基准，不能给出可靠的固定延迟或吞吐下降百分比。以下说明当前实现中的开销来源；功能测试通过不等于性能验收。
+现有 [Agent 链路基准](agent-performance-baseline.md) 可测模拟业务下的真实插桩和审计开销，但没有真实生产业务的性能验收，不能给出通用的固定延迟或吞吐下降百分比。以下说明当前实现中的开销来源；功能测试通过不等于性能验收。
 
 | 场景 | 开销与影响 |
 | --- | --- |
@@ -685,3 +685,5 @@ audit.force=true
 2026-10-06 手册复核：补充旧 release 与源码行为差异、启动状态、默认策略、空值规则、路径语法和业务拒绝处理。文档严格构建通过；本轮为文档补充，不重复宣称整套发布矩阵已运行。
 
 2026-10-06 优化验收：全量 `mvn verify` 通过 671 项测试（core 90、policy 87、telemetry 18、Agent 111、普通 Java 277、Boot 88），零失败、零错误、零跳过。独立 JVM 验证无策略／空参数／空白参数保持工具和流式原行为，未加载 Bootstrap／Byte Buddy；真实模型请求超过旧默认长度时放行，显式上限拒绝时模型调用次数为零。打包配置检查入口退出码及无审计文件副作用通过，配置单元测试覆盖重复转义键、非法值和工具 JSON 相对路径。Wiki 严格构建通过。本轮没有运行发布脚本的隔离重建／SBOM，也没有发布新 Central 版本或测量完整性能指标。
+
+随后插件复用优化完成完整 `scripts/release.sh` 验收：677 项测试通过，零失败／错误／跳过，4 个运行时 JAR 隔离重建一致，并生成 SBOM。插件生命周期变化见 [扩展指南](sdk-extension.md)，新的六模式模拟性能探针见 [Agent 基准](agent-performance-baseline.md)，升级事项见 [下一版说明草稿](next-release-notes.md)。没有发布新 Central 版本。

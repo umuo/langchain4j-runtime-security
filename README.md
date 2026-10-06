@@ -277,6 +277,8 @@ Maven 坐标已迁移为 `io.github.umuo`，Java 包名不变，项目使用 MIT
 
 最小安全接入配置见 [config/minimal.properties](config/minimal.properties)；全部配置及中文说明见 [部署示例](config/deployment-example.properties)。性能开销和本地文件说明见 [SDK 使用手册](docs/sdk-user-guide.md)。
 
+真实插桩链路的六种模式对比见 [Agent 性能基准](docs/agent-performance-baseline.md)，插件实例复用与线程安全要求见 [扩展指南](docs/sdk-extension.md)。准备升级时参考 [下一版发布说明草稿](docs/next-release-notes.md)，该说明不代表新版本已经发布。
+
 最新源码的 `max.text.chars` 未配置或空值时不限制文本长度；填写正整数时限制单次检查提取、拼接后的文本总长度。流式缓冲和工具参数等独立资源限制仍生效，详情见 [文本长度说明](docs/sdk-user-guide.md)。已发布的旧版本不自动改变行为。
 
 ### 部署前检查策略配置

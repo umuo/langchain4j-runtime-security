@@ -21,38 +21,34 @@ import java.util.concurrent.CompletableFuture;
 /** 模型与工具调用的运行时桥接层。通过反射适配业务类，避免 Agent 与应用依赖发生类加载冲突。 */
 public final class Bridge {
 
-    private static volatile PolicyEngine engine;
-
     private static final java.util.Map<ClassLoader, Boolean> checkedLoaders =
             Collections.synchronizedMap(new WeakHashMap<>());
 
     private static int maxTextChars;
 
-    private static volatile ClassValue<PolicyEngine> engines = newEngines();
+    private static volatile LoaderEngineCache engines;
 
-    private static ClassValue<PolicyEngine> newEngines() {
-        return new ClassValue<>() {
-
-            @Override
-            protected PolicyEngine computeValue(Class<?> requestClass) {
-                try {
-                    var plugins =
-                            engine.loadDetectors(
-                                    () ->
-                                            java.util.ServiceLoader.load(
-                                                            Detector.class,
-                                                            requestClass.getClassLoader())
-                                                    .stream()
-                                                    .map(java.util.ServiceLoader.Provider::get)
-                                                    .toList());
-                    return engine.withAdditionalDetectors(plugins);
-                } catch (SecurityBlockedException denied) {
-                    throw denied;
-                } catch (java.util.ServiceConfigurationError | RuntimeException e) {
-                    throw new SecurityBlockedException("detector-load-error");
-                }
-            }
-        };
+    private static LoaderEngineCache newEngines(
+            PolicyEngine base, java.time.Duration loadingTimeout) {
+        return new LoaderEngineCache(
+                classLoader -> {
+                    try {
+                        var plugins =
+                                base.loadDetectors(
+                                        () ->
+                                                java.util.ServiceLoader.load(
+                                                                Detector.class, classLoader)
+                                                        .stream()
+                                                        .map(java.util.ServiceLoader.Provider::get)
+                                                        .toList());
+                        return base.withAdditionalDetectors(plugins);
+                    } catch (SecurityBlockedException denied) {
+                        throw denied;
+                    } catch (java.util.ServiceConfigurationError | RuntimeException error) {
+                        throw new SecurityBlockedException("detector-load-error");
+                    }
+                },
+                loadingTimeout);
     }
 
     private static volatile boolean transformationFailed;
@@ -60,9 +56,13 @@ public final class Bridge {
     private Bridge() {}
 
     public static void initialize(PolicyEngine policy, int maxChars) {
-        engine = policy;
+        initialize(policy, maxChars, io.agentsecurity.core.DetectionLimits.defaults().timeout());
+    }
+
+    public static void initialize(
+            PolicyEngine policy, int maxChars, java.time.Duration loadingTimeout) {
         maxTextChars = maxChars;
-        engines = newEngines();
+        engines = newEngines(policy, loadingTimeout);
     }
 
     public static void transformationFailed() {

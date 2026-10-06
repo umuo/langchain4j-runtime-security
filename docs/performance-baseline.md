@@ -60,3 +60,5 @@ python3 scripts/benchmark_telemetry.py --iterations 200000 --threads 1 4 --forks
 4. 使用 JMH 或等效严谨基准隔离微小开销，配合 GC／分配与 CPU 剖析；生产门槛依据目标环境确定。
 
 CI 只运行三个短场景检查编译、执行及计数约束，保存报告，不对性能数值设门槛。
+
+需要测量真实插桩、文本提取、工具执行器和文件审计时，使用 [Agent 链路基准](agent-performance-baseline.md)。本页面的遥测基线不包含这些开销。

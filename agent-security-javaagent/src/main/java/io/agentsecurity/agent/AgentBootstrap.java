@@ -196,7 +196,7 @@ final class AgentBootstrap {
                         : io.agentsecurity.core.telemetry.SecurityTelemetry.disabled();
         PolicyEngine policyEngine = new PolicyEngine(detectors, audit, limits, telemetry);
         io.agentsecurity.core.health.AgentCoverage.global().bind(policyEngine, audit);
-        Bridge.initialize(policyEngine, localPolicy.maxTextChars());
+        Bridge.initialize(policyEngine, localPolicy.maxTextChars(), limits.timeout());
         Runtime.getRuntime()
                 .addShutdownHook(
                         new Thread(
