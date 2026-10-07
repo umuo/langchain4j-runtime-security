@@ -4,7 +4,7 @@
 
 如果第一次看这个仓库，建议从 **`Demo.main` 的 `tool` 场景开始，看见工具被阻断，再进入 `PolicyEngine.check` 理解决策，最后回头看 Java Agent 如何把两者连接起来**。第一次只追同步工具调用，不必同时理解流式状态机、RAG 和所有 Byte Buddy 匹配规则。
 
-本文按当前代码布局编写，命令均在仓库根目录执行。源码按 Java 17 编译，本地验证使用 JDK 21；Agent 固定适配 LangChain4j 1.20.0。文中的方法名比行号更适合定位，行号会随后续重构变化。
+本文按当前代码布局编写，命令均在仓库根目录执行。源码按 Java 17 编译，本地验证使用 JDK 21；Agent 构建基准为 LangChain4j 1.20.0，版本准入与验证范围见 [兼容性说明](langchain4j-compatibility.md)。文中的方法名比行号更适合定位，行号会随后续重构变化。
 
 ## 一、先确定你的学习目标
 
@@ -17,13 +17,14 @@
 
 学习时始终带着四个问题：**在哪里拦截？拿到了什么信息？什么时候决定放行？失败时业务动作是否已经发生？**
 
-## 二、项目地图：先认识五个模块
+## 二、项目地图：先认识六个模块
 
 | 模块 | 作用 | 第一遍关注点 |
 | --- | --- | --- |
 | `demo` | 不依赖安全 SDK 的 LangChain4j 演示应用 | 工具计数、模型计数和 Agent 有无的差异 |
 | `agent-security-core` | 无第三方运行时依赖的安全内核 | 事件、决策、检测器、策略引擎、上下文、审计 |
 | `agent-security-policy` | 结构化工具参数策略 | 严格 JSON 解析、规则编译与校验 |
+| `agent-security-telemetry` | 可观测性收集与导出 | 同步链路读懂后，再看有界收集、指标和导出器 |
 | `agent-security-javaagent` | JVM 启动时安装的拦截层 | 启动装配 → 类型和方法匹配 → Advice → Bridge |
 | `integration-spring-boot` | Boot 集成验证应用 | nested JAR 类加载、应用 SPI、官方客户端及本机 HTTP/SSE |
 
@@ -158,6 +159,8 @@ mvn -B -ntp -s .mvn/settings.xml -Dmaven.repo.local=.cache/m2 \
 ```text
 JVM 读取 -javaagent
   → SecurityAgent.premain
+      → 参数未提供或为空白：直接返回，不初始化或安装插桩
+      → 提供策略路径：继续下列装配
   → AgentBootstrap.initialize
       → 检查是否已有 LangChain4j 类被提前加载
       → 读取配置、创建检测器及审计
@@ -231,15 +234,17 @@ IDE 连接本机 5005 端口，使用本仓库当前源码。`suspend=y` 会等�
 
 ## 第 5 步：跟一个业务专属策略如何被发现
 
-同步链路读懂后，读 `Bridge.newEngines()` 内的 `ClassValue.computeValue`：
+同步链路读懂后，先读 `Bridge.newEngines()` 的 SPI 加载工厂，再读 `bridge/LoaderEngineCache` 的 `requests.computeValue`、`entry` 和 `Entry.get`：
 
 ```text
-某边界对象对应的类首次需要组合引擎
-  → 使用该类的 ClassLoader
+某边界对象对应的类首次查询组合引擎
+  → ClassValue 将请求类关联到共享缓存条目
+  → 按该类的 ClassLoader 对象身份查找条目
+  → 首次访问时只执行一次加载工厂
   → ServiceLoader.load(Detector.class, loader)
   → PolicyEngine.loadDetectors 限制构造耗时
   → withAdditionalDetectors 追加应用策略
-  → 缓存该类对应的组合引擎
+  → 同一 ClassLoader 的其他请求类复用该组合引擎
 ```
 
 接着看：
@@ -248,7 +253,7 @@ IDE 连接本机 5005 端口，使用本仓库当前源码。`suspend=y` 会等�
 - `integration-spring-boot/src/main/java/io/agentsecurity/fixture/FixtureDetector.java`。
 - `BootIT` 中的 `plugin`、`plugin-timeout`、`plugin-error` 场景。
 
-关注两个容易忽略的点：SPI 文件不存在可能只是发现零个扩展，并不自动报错；`ClassValue` 缓存也不意味着一个插件全 JVM 只构造一次。检测器必须线程安全，不能依赖跨 JAR 的发现顺序。
+关注几个容易忽略的点：SPI 文件不存在可能只是发现零个扩展，并不自动报错；实例按 ClassLoader 共享，不是全 JVM 单例。检测器必须线程安全，不能依赖跨 JAR 的发现顺序。初始化失败会缓存，后续调用持续拒绝；某个等待者超时不取消共享初始化。索引的键和值使用弱引用，避免插件持有加载器时形成永久保留链。对应并发、身份隔离和回收测试见 `LoaderEngineCacheTest`；完整生命周期说明见 [扩展指南](sdk-extension.md)。
 
 **练习：**按 [SDK 扩展指南](sdk-extension.md) 完成 `OrderSecurityDetector` 和 `PluginSmoke`，先跑独立自检，再接到实际业务工具入口。不要为了让例子工作去修改 `Bridge` 静态状态。
 

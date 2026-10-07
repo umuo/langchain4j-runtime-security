@@ -45,11 +45,15 @@ flowchart TB
 flowchart TB
     JVM["启动 JVM<br/>带上 -javaagent 和配置路径"]
     MAIN["SecurityAgent.premain"]
+    CONFIG{"是否提供非空策略路径？"}
+    SKIP["直接返回<br/>应用按原始路径运行"]
     BOOT["AgentBootstrap.initialize<br/>读取配置，创建规则、审计和线程资源"]
     INSTALL["AgentInstrumentation.install<br/>注册类转换器"]
     LOAD["匹配的目标类加载<br/>在指定方法边界织入 Advice 逻辑"]
     CALL["之后的业务调用<br/>运行已经插入的检查逻辑"]
-    JVM --> MAIN --> BOOT --> INSTALL --> LOAD --> CALL
+    JVM --> MAIN --> CONFIG
+    CONFIG -- "否" --> SKIP
+    CONFIG -- "是" --> BOOT --> INSTALL --> LOAD --> CALL
 ```
 
 可以把启动阶段理解为“把检查站安装好”，运行阶段理解为“每次经过检查站接受检查”。因此，**每次请求不用重新执行 `premain`**。
@@ -229,4 +233,4 @@ bash scripts/demo.sh tool-output
 
 这五段连起来后，再读 `AgentInstrumentation.install`，理解“检查逻辑是怎么装进去的”。更完整的逐步阅读、断点和练习见 [源码学习指南](source-learning.md)；要写自己的策略，则转到 [SDK 扩展指南](sdk-extension.md)。
 
-当前适配范围固定为 LangChain4j 1.20.0。图表示当前设计原理，不扩大已验证的覆盖范围；真实边界见 [生产验收清单](production-readiness.md)。
+当前构建基准为 LangChain4j 1.20.0，另验证 1.21.0；正式补丁版本准入及 MCP 限制见 [兼容性说明](langchain4j-compatibility.md)。图表示当前设计原理，不扩大已验证的覆盖范围；真实边界见 [生产验收清单](production-readiness.md)。
