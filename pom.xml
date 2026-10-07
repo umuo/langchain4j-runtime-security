@@ -113,6 +113,7 @@
               <include>src/main/java/**/*.java</include>
               <include>src/test/java/**/*.java</include>
               <include>benchmarks/*.java</include>
+              <include>examples/bytebuddy-basics/src/**/*.java</include>
             </includes>
             <googleJavaFormat>
               <version>1.24.0</version>

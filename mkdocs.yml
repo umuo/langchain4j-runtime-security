@@ -84,6 +84,7 @@ nav:
       - 下一版发布说明草稿: next-release-notes.md
       - 生产验收清单: production-readiness.md
   - 设计与维护:
+      - Byte Buddy 与 Java Agent 入门: bytebuddy-javaagent-basics.md
       - 源码学习路线: source-learning.md
       - 开发规范与代码布局: development.md
       - 技术调研与方案边界: langchain4j-runtime-security-spike.md

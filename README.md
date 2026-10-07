@@ -247,6 +247,8 @@ Reactive Publisher 保持冷订阅：仅创建 Publisher 不启动模型请求�
 
 第一次阅读源码可按 [源码学习指南](docs/source-learning.md) 从一次工具阻断开始，逐步跟踪策略引擎、Agent 插桩、SPI、异步和流式保护。
 
+尚不熟悉 Byte Buddy 或 `-javaagent`，先看 [新手入门文档](docs/bytebuddy-javaagent-basics.md)，运行独立的启动顺序、放行与阻断实验。
+
 代码布局、中文注释约定和自动格式检查见 [开发规范](docs/development.md)。
 
 ## 文档 Wiki

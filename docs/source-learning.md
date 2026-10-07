@@ -2,6 +2,8 @@
 
 如果还不熟悉框架的整体工作方式，先阅读 [图解架构](architecture-explained.md)：从检查站的职责、放行／阻断过程，再回到下面的源码路线。
 
+没有学过字节码增强或不理解 `-javaagent`，先读 [Byte Buddy 与 Java Agent 入门](bytebuddy-javaagent-basics.md)，运行启动顺序和方法阻断两个小实验，再进入本指南第 4 步。
+
 如果第一次看这个仓库，建议从 **`Demo.main` 的 `tool` 场景开始，看见工具被阻断，再进入 `PolicyEngine.check` 理解决策，最后回头看 Java Agent 如何把两者连接起来**。第一次只追同步工具调用，不必同时理解流式状态机、RAG 和所有 Byte Buddy 匹配规则。
 
 本文按当前代码布局编写，命令均在仓库根目录执行。源码按 Java 17 编译，本地验证使用 JDK 21；Agent 构建基准为 LangChain4j 1.20.0，版本准入与验证范围见 [兼容性说明](langchain4j-compatibility.md)。文中的方法名比行号更适合定位，行号会随后续重构变化。
